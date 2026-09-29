@@ -762,6 +762,14 @@ const RENAMED_CHILDREN: &[(&str, &str, &str)] = &[
     ("clipboard", "disable-primary", "enabled"),
     ("hotkey-overlay", "skip-at-startup", "enabled"),
     ("xwayland-satellite", "path", "wm-class"),
+    // `off` is how niri spells "this section is disabled" in every section that
+    // has an `enabled` field, not just `blur`.
+    ("animations", "off", "enabled"),
+    // niri calls the animation `window-movement`; the schema field is
+    // `window_move`, which kebab-cases to `window-move`. Without this entry the
+    // engine reads the node correctly and then reports that very node as a name
+    // it does not know, which is a warning about something it just understood.
+    ("animations", "window-movement", "window-move"),
 ];
 
 /// The serde field name a KDL child name feeds, or the name itself.
@@ -1901,6 +1909,212 @@ mod tests {
     }
 
     // --- read path: names niri actually writes -------------------------------
+
+    /// Every KDL child name the engine looks up, per section that
+    /// `report_unknown_children` checks.
+    ///
+    /// A name has to satisfy one rule in both places at once: the reader looks
+    /// it up by its KDL spelling, and the report resolves it through
+    /// [`serde_name_of`] to decide whether the schema has a field for it. A name
+    /// that reads correctly but resolves to nothing is reported as not
+    /// understood - a warning about something the engine just read. Listing them
+    /// here turns that into a failing test rather than a warning in somebody's
+    /// status panel.
+    const READ_NAMES: &[(&str, &[&str])] = &[
+        (
+            "input",
+            &[
+                "keyboard",
+                "touchpad",
+                "mouse",
+                "trackpoint",
+                "tablet",
+                "touch",
+                "focus-follows-mouse",
+                "warp-mouse-to-focus",
+                "mod-key",
+            ],
+        ),
+        (
+            "layout",
+            &[
+                "gaps",
+                "center-focused-column",
+                "always-center-single-column",
+                "empty-workspace-above-first",
+                "default-column-display",
+                "background-color",
+                "focus-ring",
+                "border",
+                "shadow",
+                "tab-indicator",
+                "struts",
+            ],
+        ),
+        (
+            "cursor",
+            &[
+                "xcursor-theme",
+                "xcursor-size",
+                "hide-when-typing",
+                "hide-after-inactive-ms",
+            ],
+        ),
+        (
+            "blur",
+            &[
+                "on",
+                "off",
+                "radius",
+                "passes",
+                "noise",
+                "contrast",
+                "brightness",
+            ],
+        ),
+        ("clipboard", &["disable-primary", "history", "max-items"]),
+        (
+            "animations",
+            &[
+                "off",
+                "slowdown",
+                "window-open",
+                "window-close",
+                "window-movement",
+                "window-resize",
+                "workspace-switch",
+            ],
+        ),
+        // `workspace-shadow` is niri's own name for the field, but niri writes
+        // it as a block and the schema has a bool, so the engine does not read
+        // it. Not listed here: this table is what the engine looks up.
+        ("overview", &["zoom", "backdrop-color"]),
+        (
+            "switch-events",
+            &["lid-close", "lid-open", "tablet-mode-on", "tablet-mode-off"],
+        ),
+        (
+            "hotkey-overlay",
+            &["skip-at-startup", "delay-ms", "width", "height"],
+        ),
+        ("xwayland-satellite", &["path"]),
+    ];
+
+    fn schema_keys<T: serde::Serialize>(value: &T) -> serde_json::Map<String, serde_json::Value> {
+        serde_json::to_value(value)
+            .expect("a schema struct always serializes")
+            .as_object()
+            .expect("a schema struct is always an object")
+            .clone()
+    }
+
+    /// A projection with everything present, so the key set is the full field
+    /// list rather than only what one file happened to set.
+    fn full_config() -> Config {
+        Config {
+            input: Some(InputConfig::default()),
+            layout: Some(LayoutConfig::default()),
+            cursor: Some(CursorConfig::default()),
+            blur: Some(BlurConfig::default()),
+            clipboard: Some(ClipboardConfig::default()),
+            animations: Some(AnimationsConfig::default()),
+            overview: Some(OverviewConfig::default()),
+            switch_events: Some(SwitchEventsConfig::default()),
+            hotkey_overlay: Some(HotkeyOverlayConfig::default()),
+            xwayland_satellite: Some(XwaylandSatelliteConfig::default()),
+            ..Config::default()
+        }
+    }
+
+    #[test]
+    fn every_name_the_engine_reads_resolves_to_a_real_schema_field() {
+        let config = full_config();
+        let sections: Vec<(&str, serde_json::Map<String, serde_json::Value>)> = vec![
+            ("input", schema_keys(&config.input)),
+            ("layout", schema_keys(&config.layout)),
+            ("cursor", schema_keys(&config.cursor)),
+            ("blur", schema_keys(&config.blur)),
+            ("clipboard", schema_keys(&config.clipboard)),
+            ("animations", schema_keys(&config.animations)),
+            ("overview", schema_keys(&config.overview)),
+            ("switch-events", schema_keys(&config.switch_events)),
+            ("hotkey-overlay", schema_keys(&config.hotkey_overlay)),
+            (
+                "xwayland-satellite",
+                schema_keys(&config.xwayland_satellite),
+            ),
+        ];
+
+        for (section, names) in READ_NAMES {
+            let keys = sections
+                .iter()
+                .find(|(name, _)| name == section)
+                .map(|(_, keys)| keys)
+                .unwrap_or_else(|| panic!("{section} is not a reported section"));
+            for kdl_name in *names {
+                let serde_name = serde_name_of(section, kdl_name);
+                assert!(
+                    keys.contains_key(serde_name),
+                    "{section}.{kdl_name} is read by the engine but resolves to \
+                     `{serde_name}`, which is not a field of the schema struct"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn no_rename_points_at_a_field_that_does_not_exist() {
+        // Catches a typo in the table itself, which would otherwise turn into a
+        // node the engine reports as unknown and never reads.
+        let config = full_config();
+        for (section, kdl_name, serde_name) in RENAMED_CHILDREN {
+            let keys = match *section {
+                "input" => schema_keys(&config.input),
+                "layout" => schema_keys(&config.layout),
+                "cursor" => schema_keys(&config.cursor),
+                "blur" => schema_keys(&config.blur),
+                "clipboard" => schema_keys(&config.clipboard),
+                "animations" => schema_keys(&config.animations),
+                "overview" => schema_keys(&config.overview),
+                "switch-events" => schema_keys(&config.switch_events),
+                "hotkey-overlay" => schema_keys(&config.hotkey_overlay),
+                "xwayland-satellite" => schema_keys(&config.xwayland_satellite),
+                other => panic!("rename table names an unreported section: {other}"),
+            };
+            assert!(
+                keys.contains_key(*serde_name),
+                "{section}: rename `{kdl_name}` -> `{serde_name}`, but that is not a field"
+            );
+        }
+    }
+
+    #[test]
+    fn window_movement_is_read_and_not_reported() {
+        // niri writes `window-movement`; the schema field is `window_move`,
+        // which kebab-cases to `window-move`. Both the read and the report have
+        // to agree, or the engine warns about a node it just understood.
+        let body = "animations {\n    window-movement {\n        duration-ms 150\n    }\n}\n";
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let (config, report) = to_config_with_report(&set).expect("project");
+        assert!(
+            report.unmapped.is_empty(),
+            "window-movement was reported as unknown: {:?}",
+            report.unmapped
+        );
+        let animations = config.animations.as_ref().expect("animations");
+        assert_eq!(
+            animations.window_move.as_ref().and_then(|a| a.duration),
+            Some(150)
+        );
+
+        // And the round-trip still leaves the file alone.
+        apply_config(&mut set, &config).expect("apply");
+        assert_eq!(set.main().doc.to_string(), body);
+    }
 
     #[test]
     fn animation_names_are_read_the_way_niri_writes_them() {
