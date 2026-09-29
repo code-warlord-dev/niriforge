@@ -1,8 +1,8 @@
 //! Niri IPC integration: `niri msg` wrapper, live data, and validation.
 
 pub mod ipc;
-pub mod validate;
 pub mod types;
+pub mod validate;
 
 use crate::error::{AppError, AppResult};
 
@@ -20,16 +20,8 @@ pub async fn get_niri_version() -> AppResult<String> {
 
 /// Validate a config file using `niri validate`.
 #[allow(dead_code, unused_variables)]
-pub async fn validate_config_file(path: &std::path::Path) -> AppResult<Vec<crate::error::ValidationError>> {
+pub async fn validate_config_file(
+    path: &std::path::Path,
+) -> AppResult<Vec<crate::error::ValidationError>> {
     Err(AppError::other("Not implemented yet"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_niri_module_exists() {
-        assert!(true);
-    }
 }

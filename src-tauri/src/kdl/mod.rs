@@ -1,8 +1,8 @@
 //! KDL parsing, serialization, include resolution, and source-map for niri configs.
 
+pub mod include;
 pub mod parser;
 pub mod serializer;
-pub mod include;
 pub mod source_map;
 
 use crate::error::{AppError, AppResult};
@@ -18,15 +18,4 @@ pub async fn parse_config(main_path: &std::path::Path) -> AppResult<Config> {
 #[allow(dead_code, unused_variables)]
 pub fn serialize_config(config: &Config) -> AppResult<String> {
     Err(AppError::other("Not implemented yet"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_kdl_module_exists() {
-        // Placeholder to ensure module compiles
-        assert!(true);
-    }
 }

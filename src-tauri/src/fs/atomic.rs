@@ -35,13 +35,3 @@ fn fsync_file(file: &File) -> io::Result<()> {
 pub fn preserve_metadata(source: &Path, dest: &Path) -> AppResult<()> {
     Err(AppError::other("Not implemented yet"))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_atomic_module_exists() {
-        assert!(true);
-    }
-}

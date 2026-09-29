@@ -18,8 +18,8 @@ pub fn get_niri_config_path() -> AppResult<PathBuf> {
 
 /// Get the NiriForge app data directory (~/.local/share/niriforge or $XDG_DATA_HOME/niriforge).
 pub fn get_app_data_dir() -> AppResult<PathBuf> {
-    let data_home = dirs::data_dir()
-        .ok_or_else(|| AppError::other("Could not determine data directory"))?;
+    let data_home =
+        dirs::data_dir().ok_or_else(|| AppError::other("Could not determine data directory"))?;
     Ok(data_home.join("niriforge"))
 }
 
@@ -44,14 +44,4 @@ pub fn ensure_app_dirs() -> AppResult<()> {
     std::fs::create_dir_all(get_backup_dir()?)?;
     std::fs::create_dir_all(get_profiles_dir()?)?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_paths_module_exists() {
-        assert!(true);
-    }
 }

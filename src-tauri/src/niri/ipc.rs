@@ -1,7 +1,7 @@
 //! Wrapper around `niri msg` for live data queries.
 
 use crate::error::{AppError, AppResult};
-use crate::niri::types::{OutputInfo, WindowInfo, WorkspaceInfo, LayerInfo};
+use crate::niri::types::{LayerInfo, OutputInfo, WindowInfo, WorkspaceInfo};
 
 /// Execute `niri msg` with given arguments and return stdout.
 #[allow(dead_code, unused_variables)]
@@ -46,14 +46,4 @@ where
     T: for<'de> serde::Deserialize<'de>,
 {
     Err(AppError::other("Not implemented yet"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ipc_module_exists() {
-        assert!(true);
-    }
 }

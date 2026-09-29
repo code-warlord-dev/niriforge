@@ -84,13 +84,3 @@ pub struct VersionInfo {
     pub version: String,
     pub commit: Option<String>,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_types_module_exists() {
-        assert!(true);
-    }
-}
