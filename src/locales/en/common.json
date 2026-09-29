@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "NiriForge",
+    "version": "Version {{version}}"
+  },
+  "theme": {
+    "system": "System",
+    "dark": "Dark",
+    "light": "Light"
+  },
+  "sidebar": {
+    "outputs": "Outputs",
+    "input": "Input",
+    "binds": "Binds",
+    "layout": "Layout",
+    "rules": "Window Rules",
+    "animations": "Animations",
+    "gestures": "Gestures",
+    "workspaces": "Workspaces",
+    "startup": "Startup",
+    "misc": "Miscellaneous",
+    "backups": "Backups",
+    "raw": "Raw Editor"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "open_config": "Open Config",
+    "browse": "Browse…",
+    "reload": "Reload",
+    "validate": "Validate",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "clear": "Clear",
+    "navigation": "Navigation",
+    "main_navigation": "Main Navigation"
+  },
+  "validation": {
+    "title": "Validation",
+    "no_errors": "No errors",
+    "validating": "Validating...",
+    "errors_count": "{{count}} errors",
+    "warnings_count": "{{count}} warnings"
+  },
+  "backup": {
+    "auto": "Auto",
+    "named": "Named",
+    "restore": "Restore"
+  },
+  "empty": {
+    "title": "No configuration loaded",
+    "description": "Open your niri config.kdl to start editing. No sample data is used.",
+    "path_label": "Config path",
+    "loading": "Loading…",
+    "hint": "Typical path: ~/.config/niri/config.kdl (includes are resolved from the same directory)."
+  },
+  "section": {
+    "placeholder_body": "This section will be implemented in a later phase. Navigation and shell are ready."
+  },
+  "status": {
+    "unsaved": "Unsaved changes",
+    "no_config": "No config loaded"
+  },
+  "toast": {
+    "config_loaded": "Config loaded",
+    "config_load_failed": "Failed to load config",
+    "try_again": "Check the path and try again",
+    "validate_ok": "Validation passed",
+    "validate_failed": "Validation failed",
+    "save_ok": "Saved",
+    "save_failed": "Save failed",
+    "save_blocked": "Save blocked — fix validation errors",
+    "backup_created": "Backup: {{id}}"
+  }
+}
