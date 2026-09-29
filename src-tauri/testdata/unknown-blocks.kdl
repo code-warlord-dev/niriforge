@@ -1,0 +1,100 @@
+// THIS FILE IS NOT A VALID NIRI CONFIG, ON PURPOSE.
+//
+// Every node in the first half of this file is something niri does not know,
+// and niri rejects the whole file because of them. That is the point: the
+// editor has to open it anyway, keep each of these nodes exactly where it is,
+// and write it back unchanged.
+//
+// A useful way to check that the KDL itself is still well formed is to read
+// what niri complains about. It gets all the way through parsing and fails
+// only in the schema check, with an "unexpected node" or "unexpected property"
+// message for each node below. A KDL syntax error would look completely
+// different.
+//
+// Do not add this file to any "every fixture must validate" check.
+
+// ---------------------------------------------------------------------------
+// Unknown top-level nodes
+// ---------------------------------------------------------------------------
+
+// An unknown section with children.
+my-custom-block {
+    enabled true
+    threshold 12
+    tags "one" "two"
+}
+
+// An unknown section that also takes an argument, like the real nodes do.
+custom-rules "profile.kdl" {
+    load "defaults.kdl"
+}
+
+// An unknown section whose options are written as arguments.
+experimental-features {
+    enable true
+    fallback "none"
+}
+
+// An unknown node carrying a property instead of a children block.
+use-niri-graphics mode="hybrid"
+
+// A name that looks like a real one but is not. The editor must not
+// "helpfully" rewrite it into the node niri actually knows about.
+outputs {
+    scale 2
+}
+
+// A real section name used at the wrong level: niri has no top-level
+// `focus-ring`, only `layout.focus-ring`.
+focus-ring {
+    width 1
+}
+
+// A namespaced name, the way a third-party tool would spell it. Bare
+// identifiers cannot contain a dot, so it has to be quoted.
+"example.com/plugin" {
+    socket "/run/user/1000/plugin.sock"
+}
+
+// A node name that starts with a hash. "#" is not a comment character in KDL,
+// so this really is a node called "#draft".
+#draft {
+    keep true
+}
+
+// A bare boolean, with no argument and no children.
+use-experimental-look
+
+// ---------------------------------------------------------------------------
+// Unknown nodes that are switched off with "/-". A loader that stripped
+// comment-outs would drop these on save.
+// ---------------------------------------------------------------------------
+
+/-plugins {
+    load "plugin-a.kdl"
+}
+
+// ---------------------------------------------------------------------------
+// Unknown children inside a section niri does know
+// ---------------------------------------------------------------------------
+
+layout {
+    gaps 12
+
+    // niri has no `custom-column-rule` under `layout`.
+    custom-column-rule "50%"
+
+    // `layout.focus-ring` is a known section, but `thickness` is not one of
+    // its options.
+    focus-ring {
+        width 2
+        thickness 3
+    }
+}
+
+binds {
+    Mod+Q { close-window; }
+
+    // A valid action, but with an extra property on the binding.
+    Mod+W repeat=false when-focused=true { toggle-overview; }
+}

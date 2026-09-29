@@ -1,0 +1,11 @@
+// Entry point for a config laid out the way a few distributions ship it:
+// everything under cfg/, with cfg/ files including further subdirectories.
+//
+// Depth of the include tree here is 4 files:
+//   config.kdl -> cfg/display.kdl -> cfg/panel/monitors.kdl -> cfg/panel/profiles/*.kdl
+
+include "cfg/display.kdl"
+include "cfg/input.kdl"
+include "cfg/keybindings.kdl"
+include "cfg/rules.kdl"
+include "cfg/extras.kdl"

@@ -1,0 +1,13 @@
+// Shell and session behaviour, kept apart from the rest.
+
+environment {
+    NIRIFORGE_SHELL "bash"
+    NIRIFORGE_TERMINAL "foot"
+}
+
+spawn-at-startup "waybar"
+
+binds {
+    Mod+Shift+Return { spawn "foot"; }
+    Mod+Q repeat=false { close-window; }
+}

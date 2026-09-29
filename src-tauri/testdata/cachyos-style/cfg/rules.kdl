@@ -1,0 +1,31 @@
+// Window and layer rules.
+
+window-rule {
+    match app-id=r#"^org\.example\.Demo$"#
+    open-floating true
+    default-column-width { proportion 0.5; }
+}
+
+window-rule {
+    match app-id=r#"^org\.keepassxc\.KeePassXC$"#
+    block-out-from "screen-capture"
+}
+
+window-rule {
+    match app-id=r#"^firefox$"#
+    geometry-corner-radius 10
+    clip-to-geometry true
+}
+
+layer-rule {
+    match namespace=r#"^panel$"#
+    place-within-backdrop true
+}
+
+workspace "main" {
+    open-on-output "eDP-1"
+}
+
+workspace "web" {
+    open-on-output "DP-2"
+}

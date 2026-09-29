@@ -1,0 +1,8 @@
+// Display settings. The actual monitor list lives one level deeper.
+
+layout {
+    gaps 10
+    center-focused-column "on-overflow"
+}
+
+include "panel/monitors.kdl"
