@@ -104,9 +104,13 @@ pub struct ConfigFile {
 /// that connects them.
 #[derive(Debug, Clone)]
 pub struct KdlConfigSet {
-    /// The file the user opened. Kept separate from `files` because every other
-    /// file is only reachable relative to it.
-    pub main: ConfigFile,
+    /// Canonical path of the file the user opened.
+    ///
+    /// This is a path, not a second copy of the file. Holding a `ConfigFile`
+    /// here as well would give the entry point two documents: `apply_config`
+    /// edits the one in `files`, and the copy left behind would go on serving
+    /// the pre-edit tree to every caller that reached for it.
+    pub main_path: PathBuf,
     /// All files, entry point first, in resolution order.
     pub files: Vec<ConfigFile>,
     /// Include structure of the set.
@@ -116,6 +120,12 @@ pub struct KdlConfigSet {
 }
 
 impl KdlConfigSet {
+    /// The file the user opened.
+    pub fn main(&self) -> &ConfigFile {
+        self.file(&self.main_path)
+            .expect("the entry point is always the first entry of `files`")
+    }
+
     /// Look a file up by canonical path.
     pub fn file(&self, path: &Path) -> Option<&ConfigFile> {
         self.files.iter().find(|f| f.path == path)
@@ -138,14 +148,12 @@ impl KdlConfigSet {
 /// first, its includes are resolved recursively, and each file is recorded in
 /// the source map against the text it was parsed from.
 pub fn load_config_set(main_path: &Path) -> AppResult<KdlConfigSet> {
-    let main = read_file(main_path, false, 0)?;
-    let canonical = canonical_or_keep(&main.path);
+    let mut entry = read_file(main_path, false, 0)?;
+    let canonical = canonical_or_keep(&entry.path);
+    entry.path = canonical.clone();
 
     let mut set = KdlConfigSet {
-        main: ConfigFile {
-            path: canonical.clone(),
-            ..main
-        },
+        main_path: canonical.clone(),
         files: Vec::new(),
         includes: IncludeTree {
             main: canonical.clone(),
@@ -155,10 +163,9 @@ pub fn load_config_set(main_path: &Path) -> AppResult<KdlConfigSet> {
         source_map: SourceMap::new(),
     };
     set.source_map
-        .record_document(canonical.clone(), &set.main.doc, &set.main.source, false);
-    set.files.push(set.main.clone());
+        .record_document(canonical.clone(), &entry.doc, &entry.source, false);
+    set.files.push(entry.clone());
 
-    let entry = set.main.clone();
     let mut stack = vec![canonical.clone()];
     resolve_file(&canonical, &entry, &mut set, &mut stack, 0)?;
 

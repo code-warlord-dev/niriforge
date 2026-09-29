@@ -72,14 +72,19 @@ impl std::fmt::Display for Unmapped {
 pub struct ConfigReport {
     /// Nodes left in the AST because the schema has no field for them.
     pub unmapped: Vec<Unmapped>,
-    /// Repeated top-level nodes, which niri rejects.
+    /// Repeated top-level nodes in the same file, which niri rejects.
     pub duplicates: Vec<Unmapped>,
+    /// A section that appears in more than one file of the set. niri accepts
+    /// this, so it is not an error, but only one copy takes effect and a save
+    /// writes all of them - the user has to know.
+    pub shadowed: Vec<Unmapped>,
 }
 
 impl ConfigReport {
-    /// True when nothing was left over and no duplicate was seen.
+    /// True when nothing was left over, no duplicate was seen and no section is
+    /// split across files.
     pub fn is_clean(&self) -> bool {
-        self.unmapped.is_empty() && self.duplicates.is_empty()
+        self.unmapped.is_empty() && self.duplicates.is_empty() && self.shadowed.is_empty()
     }
 }
 
@@ -132,10 +137,21 @@ impl<'a> MergedConfig<'a> {
     /// per file, because the fixtures and real configs are free to repeat a
     /// section in a second file only if niri would accept it - and it does not.
     fn build(set: &'a KdlConfigSet) -> (Self, ConfigReport) {
-        let mut nodes = Vec::new();
+        let mut nodes: Vec<Located<'a>> = Vec::new();
         let mut report = ConfigReport::default();
+        // Where each singleton section was first seen, as an index into `nodes`.
+        // A section in two files is legal, so this is a warning rather than an
+        // error - but the user has to hear about it, because only one of the two
+        // survives and a save writes both.
+        let mut first_seen: Vec<(&str, usize)> = Vec::new();
 
         for file in &set.files {
+            // Reset per file, deliberately. niri parses each file on its own and
+            // raises `duplicate node \`layout\`, single node expected` from
+            // within a single document; a `layout` in `config.kdl` and another in
+            // `cfg/layout.kdl` is accepted. Treating the set as one document
+            // would reject configs niri loads, such as the `noctalia-style`
+            // fixture with `environment` in two files.
             let mut seen: Vec<&str> = Vec::new();
             for node in file.doc.nodes() {
                 if node.name().value() == "include" {
@@ -145,12 +161,33 @@ impl<'a> MergedConfig<'a> {
                 // Repeating a section is only an error where the schema has one
                 // slot for it. `output` and `window-rule` are lists in niri, so
                 // a second one is not a conflict.
-                if SINGLETON_SECTIONS.contains(&name) && seen.contains(&name) {
+                let mut shadowed = false;
+                if SINGLETON_SECTIONS.contains(&name) {
+                    if seen.contains(&name) {
+                        report
+                            .duplicates
+                            .push(unmapped(set, &file.path, node, DUPLICATE));
+                    } else {
+                        seen.push(name);
+                        let index = nodes.len();
+                        match first_seen.iter().find(|(n, _)| *n == name) {
+                            Some((_, earlier)) => {
+                                report.shadowed.push(unmapped(
+                                    set,
+                                    nodes[*earlier].file,
+                                    nodes[*earlier].node,
+                                    SHADOWED,
+                                ));
+                                shadowed = true;
+                            }
+                            None => first_seen.push((name, index)),
+                        }
+                    }
+                }
+                if shadowed {
                     report
-                        .duplicates
-                        .push(unmapped(set, &file.path, node, DUPLICATE));
-                } else {
-                    seen.push(name);
+                        .shadowed
+                        .push(unmapped(set, &file.path, node, SHADOWED));
                 }
                 nodes.push(Located {
                     file: &file.path,
@@ -273,6 +310,8 @@ const SINGLETON_SECTIONS: &[&str] = &[
 const DUPLICATE: &str = "a section may appear only once";
 const NO_SHAPE: &str = "no schema field has this shape";
 const NO_FIELD: &str = "not a field of the schema struct";
+const SHADOWED: &str =
+    "this section is in more than one file; niri loads them all, a save writes all of them";
 
 /// Convert a `kdl` value into JSON, keeping the distinction niri cares about.
 ///
@@ -311,8 +350,14 @@ pub fn to_config_with_report(set: &KdlConfigSet) -> Result<(Config, ConfigReport
         ));
     }
 
+    // A malformed `include` was already rejected while the set was loaded, so
+    // this cannot fail here; if it ever does, the directives are part of the
+    // config and swallowing the error would hide that.
+    let includes = crate::kdl::include::extract_includes(&set.main().doc)
+        .map_err(|e| SchemaError::Message(e.to_string()))?;
+
     let mut config = Config {
-        includes: crate::kdl::include::extract_includes(&set.main.doc).unwrap_or_default(),
+        includes,
         ..Config::default()
     };
 
@@ -415,10 +460,18 @@ pub fn apply_config(set: &mut KdlConfigSet, config: &Config) -> Result<ChangedFi
     let mut changed = Vec::new();
     for file in &mut set.files {
         let before = file.source.clone();
-        apply_to_file(file, config);
-        if file.doc.to_string() != before {
-            changed.push(file.path.clone());
+        apply_to_file(file, config)?;
+        if file.doc.to_string() == before {
+            continue;
         }
+        // The source map keeps its own copy of every document, so an edit made
+        // here would otherwise leave `get_document` handing out the pre-edit
+        // tree to whatever asks next. The stored *text* stays the original:
+        // spans recorded at parse time still index into it, and that is what
+        // keeps a reported line number pointing at the line the user wrote.
+        set.source_map
+            .store_document(file.path.clone(), file.doc.clone(), &file.source);
+        changed.push(file.path.clone());
     }
     Ok(changed)
 }
@@ -428,42 +481,69 @@ pub fn apply_config(set: &mut KdlConfigSet, config: &Config) -> Result<ChangedFi
 /// Only nodes that already exist are touched. Adding a node would mean picking
 /// an indentation and a position for it, and a config that grows a new section
 /// on save is a surprise the user cannot explain.
-fn apply_to_file(file: &mut ConfigFile, config: &Config) {
+fn apply_to_file(file: &mut ConfigFile, config: &Config) -> Result<(), ApplyError> {
     if let Some(path) = &config.screenshot_path {
         if let Some(node) = find_top(&mut file.doc, "screenshot-path") {
-            set_single_arg(node, Value::String(path.clone()));
+            set_single_arg(node, Value::String(path.clone()))?;
         }
     }
-    if config.prefer_no_csd {
-        if let Some(node) = find_top(&mut file.doc, "prefer-no-csd") {
-            set_flag(node, true);
-        }
+    // `prefer_no_csd` is a plain bool, so both values have to be writable. A
+    // bare `prefer-no-csd` already means true and is left alone; false has to
+    // be spelled out, because there is no other way to say it.
+    if let Some(node) = find_top(&mut file.doc, "prefer-no-csd") {
+        set_bool_arg(node, config.prefer_no_csd)?;
     }
     if let Some(gaps) = config.layout.as_ref().and_then(|l| l.gaps) {
         if let Some(node) = child_of_top(&mut file.doc, "layout", "gaps") {
-            set_single_arg(node, Value::from(gaps));
+            set_single_arg(node, Value::from(gaps))?;
         }
     }
     if let Some(enabled) = config.blur.as_ref().and_then(|b| b.enabled) {
-        if let Some(node) = child_of_top(&mut file.doc, "blur", "on") {
-            set_flag(node, enabled);
+        if let Some(children) = children_of_top(&mut file.doc, "blur") {
+            set_on_off(children, enabled);
         }
     }
+    Ok(())
 }
 
-/// Write a boolean flag, leaving a bare `on` alone.
+/// Write a toggle the way niri spells one.
 ///
-/// niri writes a true setting as a bare node and a false one as `off`, so
-/// turning `on` into `on true` would be a formatting change the user never
-/// asked for.
-fn set_flag(node: &mut KdlNode, value: bool) {
+/// niri has no boolean argument for these settings. `blur { on false }` is a
+/// file it refuses to load - `Error: unexpected argument` - so the only way to
+/// turn the setting off is to rename the node to `off`, not to give `on` a
+/// value. Both spellings are bare nodes with no entries.
+///
+/// Returns whether the document was touched, so the caller can tell a no-op from
+/// a missing node. A file that carries neither spelling has nothing to write to
+/// and is left as it is.
+fn set_on_off(children: &mut KdlDocument, value: bool) -> bool {
+    let (wanted, other) = if value { ("on", "off") } else { ("off", "on") };
+
+    for node in children.nodes_mut() {
+        if node.name().value() == wanted {
+            if node.entries().is_empty() {
+                return false;
+            }
+            node.clear_entries();
+            return true;
+        }
+    }
+    for node in children.nodes_mut() {
+        if node.name().value() == other {
+            node.set_name(kdl::KdlIdentifier::from(wanted));
+            node.clear_entries();
+            return true;
+        }
+    }
+    false
+}
+
+/// Write a boolean niri does accept as an argument, such as `prefer-no-csd false`.
+fn set_bool_arg(node: &mut KdlNode, value: bool) -> Result<(), ApplyError> {
     if MergedConfig::scalar(node) == Some(Value::Bool(value)) {
-        return;
+        return Ok(());
     }
-    if value && node.entries().is_empty() {
-        return;
-    }
-    set_single_arg(node, Value::Bool(value));
+    set_single_arg(node, Value::Bool(value))
 }
 
 fn find_top<'a>(doc: &'a mut KdlDocument, name: &str) -> Option<&'a mut KdlNode> {
@@ -472,14 +552,20 @@ fn find_top<'a>(doc: &'a mut KdlDocument, name: &str) -> Option<&'a mut KdlNode>
         .find(|n| n.name().value() == name)
 }
 
+fn children_of_top<'a>(doc: &'a mut KdlDocument, parent: &str) -> Option<&'a mut KdlDocument> {
+    children_of(find_top(doc, parent)?)
+}
+
+fn children_of(node: &mut KdlNode) -> Option<&mut KdlDocument> {
+    node.children_mut().as_mut()
+}
+
 fn child_of_top<'a>(
     doc: &'a mut KdlDocument,
     parent: &str,
     child: &str,
 ) -> Option<&'a mut KdlNode> {
-    let children = find_top(doc, parent)?.children_mut();
-    children
-        .as_mut()?
+    children_of_top(doc, parent)?
         .nodes_mut()
         .iter_mut()
         .find(|n| n.name().value() == child)
@@ -491,25 +577,54 @@ fn child_of_top<'a>(
 /// makes load -> save a byte-for-byte no-op: a value that survived the round
 /// trip through the typed model compares equal and is never re-emitted, so its
 /// original spelling (`Base10` vs `Base16`, a string vs a raw string) is kept.
-fn set_single_arg(node: &mut KdlNode, value: Value) {
-    let new = json_to_kdl(&value);
+fn set_single_arg(node: &mut KdlNode, value: Value) -> Result<(), ApplyError> {
+    let new = json_to_kdl(&value)
+        .ok_or_else(|| ApplyError::Unrepresentable(format!("{value} is not a KDL scalar")))?;
     if node
         .entries()
         .iter()
-        .any(|e| e.name().is_none() && e.value() == &new)
+        .any(|e| e.name().is_none() && same_scalar(e.value(), &new))
     {
-        return;
+        return Ok(());
     }
     if let Some(entry) = node.entries_mut().iter_mut().find(|e| e.name().is_none()) {
         *entry = kdl::KdlEntry::new(new);
-        return;
+        return Ok(());
     }
     node.entries_mut().push(kdl::KdlEntry::new(new));
+    Ok(())
+}
+
+/// Whether two KDL scalars mean the same thing.
+///
+/// `KdlValue`'s own equality is by variant, so `Base16(16)` and `Base10(16)`
+/// are different to it. They are not different to a user, and rewriting
+/// `gaps 0x10` as `gaps 16` on every save is a diff nobody asked for. Every
+/// integer base KDL accepts spells the same number, so they compare as one.
+fn same_scalar(left: &KdlValue, right: &KdlValue) -> bool {
+    match (number_of(left), number_of(right)) {
+        (Some(a), Some(b)) => a == b,
+        _ => left == right,
+    }
+}
+
+fn number_of(value: &KdlValue) -> Option<i128> {
+    Some(match value {
+        KdlValue::Base2(i) | KdlValue::Base8(i) | KdlValue::Base16(i) | KdlValue::Base10(i) => {
+            *i as i128
+        }
+        _ => return None,
+    })
 }
 
 /// JSON back to a `kdl` value, for the few fields the typed model owns.
-pub fn json_to_kdl(value: &Value) -> KdlValue {
-    match value {
+///
+/// Only scalars have a KDL spelling. A compound value has no single-argument
+/// form, and turning one into a string is how a config ends up holding
+/// `{"a":1}` in a field the user expects to read - so it is refused here and
+/// the caller decides what to do about it.
+pub fn json_to_kdl(value: &Value) -> Option<KdlValue> {
+    Some(match value {
         Value::Null => KdlValue::Null,
         Value::Bool(b) => KdlValue::Bool(*b),
         Value::Number(n) => n
@@ -518,8 +633,8 @@ pub fn json_to_kdl(value: &Value) -> KdlValue {
             .or_else(|| n.as_f64().map(KdlValue::Base10Float))
             .unwrap_or(KdlValue::Null),
         Value::String(s) => KdlValue::String(s.clone()),
-        other => KdlValue::String(other.to_string()),
-    }
+        Value::Array(_) | Value::Object(_) => return None,
+    })
 }
 
 fn section<T>(
@@ -577,34 +692,49 @@ fn report_unknown_children(
 ) {
     // Each pair is the section node and the serde view of the schema struct it
     // was read into, so the field names come from the struct itself.
-    let sections: Vec<(Option<Located<'_>>, Option<Value>)> = vec![
-        (merged.first("input"), json_of(&config.input)),
-        (merged.first("layout"), json_of(&config.layout)),
-        (merged.first("cursor"), json_of(&config.cursor)),
-        (merged.first("blur"), json_of(&config.blur)),
-        (merged.first("clipboard"), json_of(&config.clipboard)),
-        (merged.first("animations"), json_of(&config.animations)),
-        (merged.first("overview"), json_of(&config.overview)),
+    let sections: Vec<(&str, Option<Located<'_>>, Option<Value>)> = vec![
+        ("input", merged.first("input"), json_of(&config.input)),
+        ("layout", merged.first("layout"), json_of(&config.layout)),
+        ("cursor", merged.first("cursor"), json_of(&config.cursor)),
+        ("blur", merged.first("blur"), json_of(&config.blur)),
         (
+            "clipboard",
+            merged.first("clipboard"),
+            json_of(&config.clipboard),
+        ),
+        (
+            "animations",
+            merged.first("animations"),
+            json_of(&config.animations),
+        ),
+        (
+            "overview",
+            merged.first("overview"),
+            json_of(&config.overview),
+        ),
+        (
+            "switch-events",
             merged.first("switch-events"),
             json_of(&config.switch_events),
         ),
         (
+            "hotkey-overlay",
             merged.first("hotkey-overlay"),
             json_of(&config.hotkey_overlay),
         ),
         (
+            "xwayland-satellite",
             merged.first("xwayland-satellite"),
             json_of(&config.xwayland_satellite),
         ),
     ];
 
-    for (located, fields) in sections {
+    for (section, located, fields) in sections {
         let (Some(located), Some(Value::Object(fields))) = (located, fields) else {
             continue;
         };
         for (child, name) in MergedConfig::children(located.node) {
-            if fields.contains_key(name) {
+            if fields.contains_key(serde_name_of(section, name)) {
                 continue;
             }
             report
@@ -614,23 +744,70 @@ fn report_unknown_children(
     }
 }
 
+/// KDL child names that do not match the serde name of the field they feed.
+///
+/// niri and `schema/mod.rs` disagree in a handful of places, and comparing the
+/// raw node name against the field name is what made `xcursor-size`,
+/// `xcursor-theme` and `skip-at-startup` come out as "not understood" when the
+/// engine reads all three. Each entry is `(section, kdl name, serde name)`.
+///
+/// The pair form of a boolean (`on` / `off`, or a name that means the inverse)
+/// has no serde name of its own - it collapses into one `enabled` field - so
+/// both spellings point at the same field here.
+const RENAMED_CHILDREN: &[(&str, &str, &str)] = &[
+    ("cursor", "xcursor-size", "size"),
+    ("cursor", "xcursor-theme", "theme"),
+    ("blur", "on", "enabled"),
+    ("blur", "off", "enabled"),
+    ("clipboard", "disable-primary", "enabled"),
+    ("hotkey-overlay", "skip-at-startup", "enabled"),
+    ("xwayland-satellite", "path", "wm-class"),
+];
+
+/// The serde field name a KDL child name feeds, or the name itself.
+fn serde_name_of<'a>(section: &'a str, kdl_name: &'a str) -> &'a str {
+    RENAMED_CHILDREN
+        .iter()
+        .find(|(s, kdl, _)| *s == section && *kdl == kdl_name)
+        .map_or(kdl_name, |(_, _, serde)| *serde)
+}
+
 fn json_of<T: serde::Serialize>(value: &T) -> Option<Value> {
     serde_json::to_value(value).ok()
 }
 
 fn unmapped(set: &KdlConfigSet, file: &Path, node: &KdlNode, reason: &'static str) -> Unmapped {
+    let span = node.span();
     let id = NodeId {
         file: file.to_path_buf(),
-        offset: node.span().offset(),
-        length: node.span().len(),
+        offset: span.offset(),
+        length: span.len(),
     };
     let (line, column) = set.source_map.line_column(&id).unwrap_or((1, 1));
     Unmapped {
-        raw: node.to_string(),
+        raw: node_preview(set, file, node),
         file: file.to_path_buf(),
         line,
         column,
         reason,
+    }
+}
+
+/// The text of a node as the user wrote it, without the decor around it.
+///
+/// `KdlNode::to_string` includes the leading decor, so a node preceded by a
+/// comment previews as that comment and the report points the user at the wrong
+/// line. The recorded span covers the node itself, so reading the original
+/// source through it gives exactly the node and nothing else.
+fn node_preview(set: &KdlConfigSet, file: &Path, node: &KdlNode) -> String {
+    let span = node.span();
+    match set.source_map.get_source_content(file) {
+        Some(source) => source
+            .get(span.offset()..span.offset() + span.len())
+            .map(str::trim)
+            .map(str::to_string)
+            .unwrap_or_else(|| node.to_string()),
+        None => node.to_string(),
     }
 }
 
@@ -790,17 +967,21 @@ fn struts_from_kdl(node: &KdlNode) -> Option<StrutsConfig> {
 }
 
 fn animations_from_kdl(node: &KdlNode) -> Option<AnimationsConfig> {
+    // niri spells the animation names out in full (`window-open`,
+    // `workspace-switch`); the bare `open` / `close` / `switch-workspace` names
+    // match nothing in a real config. The ones niri does not have - `overview`,
+    // `overview-window`, `column-switch` - stay None rather than being guessed.
     Some(AnimationsConfig {
         enabled: node.children().map(|c| !c_has_flag(c, "off")),
         slowdown: child_f32(node, "slowdown"),
-        window_open: animation_child(node, "open"),
-        window_close: animation_child(node, "close"),
-        window_move: animation_child(node, "move"),
-        window_resize: animation_child(node, "resize"),
-        workspace_switch: animation_child(node, "switch-workspace"),
-        column_switch: animation_child(node, "switch-column"),
-        overview: animation_child(node, "overview"),
-        overview_window: animation_child(node, "overview-window"),
+        window_open: animation_child(node, "window-open"),
+        window_close: animation_child(node, "window-close"),
+        window_move: animation_child(node, "window-movement"),
+        window_resize: animation_child(node, "window-resize"),
+        workspace_switch: animation_child(node, "workspace-switch"),
+        column_switch: None,
+        overview: None,
+        overview_window: None,
     })
 }
 
@@ -812,7 +993,7 @@ fn animation_from_kdl(node: &KdlNode) -> Option<AnimationConfig> {
     Some(AnimationConfig {
         easing: child_section(node, "easing", easing_from_kdl),
         spring: child_section(node, "spring", spring_from_kdl),
-        duration: child_int(node, "duration"),
+        duration: child_int(node, "duration-ms"),
     })
 }
 
@@ -890,9 +1071,11 @@ fn debug_from_kdl(node: &KdlNode) -> Option<DebugConfig> {
 }
 
 fn cursor_from_kdl(node: &KdlNode) -> Option<CursorConfig> {
-    // niri spells the size `xcursor-size`; the schema says `size`.
+    // niri spells both of these with an `xcursor-` prefix; the schema uses the
+    // bare names. `cursor { size 24 }` is rejected by niri as an unknown node,
+    // so the prefix is the only spelling that appears in a real config.
     Some(CursorConfig {
-        theme: child_string(node, "theme"),
+        theme: child_string(node, "xcursor-theme"),
         size: child_int(node, "xcursor-size"),
         hide_when_typing: flag_child(node, "hide-when-typing"),
         hide_after_inactive_ms: child_int(node, "hide-after-inactive-ms"),
@@ -1336,4 +1519,406 @@ fn bool_prop(node: &KdlNode, name: &str) -> Option<bool> {
 
 fn child_section<T>(node: &KdlNode, name: &str, read: fn(&KdlNode) -> Option<T>) -> Option<T> {
     read(node.children().and_then(|c| c.get(name))?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kdl::include::load_config_set;
+
+    /// Write `body` to a temp config, load it, apply `edit` to the projected
+    /// model, and hand back the resulting text.
+    fn round_trip(body: &str, edit: impl FnOnce(&mut Config)) -> String {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let mut config = to_config(&set).expect("project");
+        edit(&mut config);
+        apply_config(&mut set, &config).expect("apply");
+        set.main().doc.to_string()
+    }
+
+    /// The same, but also reporting which files were touched.
+    fn round_trip_changed(body: &str, edit: impl FnOnce(&mut Config)) -> (String, ChangedFiles) {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let mut config = to_config(&set).expect("project");
+        edit(&mut config);
+        let changed = apply_config(&mut set, &config).expect("apply");
+        (set.main().doc.to_string(), changed)
+    }
+
+    fn with_blur(enabled: bool) -> impl FnOnce(&mut Config) {
+        move |config: &mut Config| {
+            config.blur = Some(BlurConfig {
+                enabled: Some(enabled),
+                ..BlurConfig::default()
+            });
+        }
+    }
+
+    // --- D-1: `on` / `off` is a rename, not a value --------------------------
+
+    #[test]
+    fn turning_blur_off_renames_on_to_off() {
+        // `blur { on false }` is a file niri refuses to load with
+        // `Error: unexpected argument`, so the engine must never produce it.
+        let out = round_trip("blur {\n  on\n  passes 2\n}\n", with_blur(false));
+        assert_eq!(out, "blur {\n  off\n  passes 2\n}\n", "{out}");
+        assert!(!out.contains("false"), "an argument was written: {out}");
+    }
+
+    #[test]
+    fn turning_blur_on_renames_off_to_on() {
+        let out = round_trip("blur {\n  off\n  passes 2\n}\n", with_blur(true));
+        assert_eq!(out, "blur {\n  on\n  passes 2\n}\n", "{out}");
+    }
+
+    #[test]
+    fn blur_already_off_is_left_alone() {
+        // The value read back out of the file already agrees with the model, so
+        // applying it has to change nothing at all - and report nothing.
+        let (out, changed) = round_trip_changed("blur {\n  off\n}\n", with_blur(false));
+        assert_eq!(out, "blur {\n  off\n}\n");
+        assert!(changed.is_empty(), "reported {changed:?} for a no-op");
+    }
+
+    #[test]
+    fn blur_already_on_is_left_alone() {
+        let (out, changed) = round_trip_changed("blur {\n  on\n}\n", with_blur(true));
+        assert_eq!(out, "blur {\n  on\n}\n");
+        assert!(changed.is_empty(), "reported {changed:?} for a no-op");
+    }
+
+    #[test]
+    fn blur_comment_next_to_the_toggle_survives_the_rename() {
+        let out = round_trip(
+            "blur {\n  // the user wrote this\n  on\n}\n",
+            with_blur(false),
+        );
+        assert_eq!(out, "blur {\n  // the user wrote this\n  off\n}\n", "{out}");
+    }
+
+    #[test]
+    fn a_block_with_neither_spelling_is_not_invented() {
+        // Adding `off` to a `blur` block that only sets `passes` would be
+        // writing a setting the user never had.
+        let (out, changed) = round_trip_changed("blur {\n  passes 2\n}\n", with_blur(false));
+        assert_eq!(out, "blur {\n  passes 2\n}\n");
+        assert!(changed.is_empty(), "reported {changed:?}");
+    }
+
+    // --- D-2: `prefer-no-csd` is a bool, so false has to be writable ---------
+
+    #[test]
+    fn disabling_prefer_no_csd_writes_false() {
+        // A bare `prefer-no-csd` already means true, so leaving it bare when the
+        // model says false is the bug: the setting could never be turned off.
+        let out = round_trip("prefer-no-csd\n", |config| {
+            config.prefer_no_csd = false;
+        });
+        assert_eq!(out, "prefer-no-csd false\n", "{out}");
+    }
+
+    #[test]
+    fn enabling_prefer_no_csd_writes_true_back() {
+        let out = round_trip("prefer-no-csd false\n", |config| {
+            config.prefer_no_csd = true;
+        });
+        assert_eq!(out, "prefer-no-csd true\n", "{out}");
+    }
+
+    #[test]
+    fn a_bare_prefer_no_csd_is_left_bare() {
+        let (out, changed) = round_trip_changed("prefer-no-csd\n", |config| {
+            config.prefer_no_csd = true;
+        });
+        assert_eq!(out, "prefer-no-csd\n", "true must not be spelled out");
+        assert!(changed.is_empty(), "reported {changed:?}");
+    }
+
+    // --- the rest of the write path ------------------------------------------
+
+    #[test]
+    fn layout_gaps_is_written() {
+        let out = round_trip("layout {\n  gaps 10\n}\n", |config| {
+            config.layout = Some(LayoutConfig {
+                gaps: Some(42),
+                ..LayoutConfig::default()
+            });
+        });
+        assert_eq!(out, "layout {\n  gaps 42\n}\n", "{out}");
+    }
+
+    #[test]
+    fn layout_gaps_keeps_its_original_form_when_unchanged() {
+        // A value that came back through the model must not be re-emitted, or
+        // every save would rewrite the whole file.
+        let (out, changed) = round_trip_changed("layout {\n  gaps 10\n}\n", |_| {});
+        assert_eq!(out, "layout {\n  gaps 10\n}\n");
+        assert!(changed.is_empty());
+    }
+
+    #[test]
+    fn a_hex_gaps_value_is_not_rewritten_in_decimal() {
+        let (out, changed) = round_trip_changed("layout {\n  gaps 0x10\n}\n", |_| {});
+        assert_eq!(out, "layout {\n  gaps 0x10\n}\n", "{out}");
+        assert!(changed.is_empty());
+    }
+
+    #[test]
+    fn screenshot_path_is_written() {
+        let out = round_trip("screenshot-path \"/old\"\n", |config| {
+            config.screenshot_path = Some("/new".to_string());
+        });
+        assert_eq!(out, "screenshot-path \"/new\"\n", "{out}");
+    }
+
+    #[test]
+    fn a_field_with_no_node_in_the_file_is_skipped() {
+        let (out, changed) = round_trip_changed("layout {\n  gaps 10\n}\n", |config| {
+            config.screenshot_path = Some("/new".to_string());
+        });
+        assert_eq!(out, "layout {\n  gaps 10\n}\n");
+        assert!(changed.is_empty(), "reported {changed:?}");
+    }
+
+    #[test]
+    fn a_non_scalar_value_is_refused_rather_than_stringified() {
+        // Turning a JSON object into `"{\"a\":1}"` is the "coerce it so it
+        // compiles" move that code-style forbids.
+        let err = set_single_arg(&mut KdlNode::new("x"), serde_json::json!({"a": 1}))
+            .expect_err("object has no KDL spelling");
+        assert!(matches!(err, ApplyError::Unrepresentable(_)), "{err:?}");
+        assert!(json_to_kdl(&serde_json::json!([1, 2])).is_none());
+        assert!(json_to_kdl(&serde_json::json!(true)).is_some());
+    }
+
+    // --- D-3: the source map must not keep a stale copy ---------------------
+
+    #[test]
+    fn the_source_map_document_follows_an_edit() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, "layout {\n  gaps 10\n}\n").expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let mut config = to_config(&set).expect("project");
+        config.layout = Some(LayoutConfig {
+            gaps: Some(42),
+            ..LayoutConfig::default()
+        });
+        let changed = apply_config(&mut set, &config).expect("apply");
+        assert_eq!(changed.len(), 1);
+
+        let live = set.main().doc.to_string();
+        let mapped = set
+            .source_map
+            .get_document(&set.main_path)
+            .expect("the source map still has a document")
+            .to_string();
+        assert_eq!(live, mapped, "source map handed out a stale document");
+        assert!(mapped.contains("gaps 42"), "{mapped}");
+    }
+
+    #[test]
+    fn an_edit_does_not_move_the_reported_line_numbers() {
+        // The stored text has to stay the original: spans recorded at parse time
+        // index into it, and that is what keeps line 1 line 1 after an edit.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        let body = "// a comment\nlayout {\n  gaps 10\n}\n";
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let layout = set
+            .main()
+            .doc
+            .nodes()
+            .iter()
+            .find(|n| n.name().value() == "layout")
+            .expect("layout node");
+        let id = crate::kdl::source_map::node_id_from_node(set.main_path.clone(), layout);
+        assert_eq!(&body[id.byte_range()][..6], "layout");
+        assert_eq!(set.source_map.line_column(&id), Some((2, 1)));
+
+        let mut config = to_config(&set).expect("project");
+        config.layout = Some(LayoutConfig {
+            gaps: Some(42),
+            ..LayoutConfig::default()
+        });
+        apply_config(&mut set, &config).expect("apply");
+        assert_eq!(set.source_map.line_column(&id), Some((2, 1)));
+        assert_eq!(
+            set.source_map.get_source_content(&set.main_path),
+            Some(body)
+        );
+    }
+
+    // --- D-4: duplicates are per file, shadowing is not ---------------------
+
+    #[test]
+    fn one_section_in_two_files_is_a_warning_not_an_error() {
+        // niri accepts this: it reports a duplicate only within a single
+        // document. Treating the set as one document would reject configs niri
+        // loads, such as `noctalia-style` with `environment` in two files.
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir_all(dir.path().join("cfg")).expect("mkdir");
+        std::fs::write(
+            dir.path().join("config.kdl"),
+            "layout {\n  gaps 1\n}\ninclude \"cfg/a.kdl\"\n",
+        )
+        .expect("write");
+        std::fs::write(dir.path().join("cfg/a.kdl"), "layout {\n  gaps 10\n}\n").expect("write");
+
+        let set = load_config_set(&dir.path().join("config.kdl")).expect("load");
+        let (config, report) = to_config_with_report(&set).expect("must not fail");
+        assert_eq!(config.layout.as_ref().and_then(|l| l.gaps), Some(1));
+        assert!(report.duplicates.is_empty(), "{:?}", report.duplicates);
+        assert_eq!(report.shadowed.len(), 2, "both copies are reported");
+        assert!(report.shadowed.iter().all(|s| s.reason == SHADOWED));
+        assert!(report.shadowed.iter().all(|s| s.raw.starts_with("layout")));
+    }
+
+    #[test]
+    fn a_section_in_two_files_is_written_to_both() {
+        // Both copies are live as far as the file layout goes, and only one
+        // survives in the running compositor. Writing both is the only choice
+        // that does not silently leave a stale value behind in one of them; the
+        // report is what tells the user this is ambiguous.
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir_all(dir.path().join("cfg")).expect("mkdir");
+        std::fs::write(
+            dir.path().join("config.kdl"),
+            "layout {\n  gaps 1\n}\ninclude \"cfg/a.kdl\"\n",
+        )
+        .expect("write");
+        std::fs::write(dir.path().join("cfg/a.kdl"), "layout {\n  gaps 10\n}\n").expect("write");
+
+        let mut set = load_config_set(&dir.path().join("config.kdl")).expect("load");
+        let mut config = to_config(&set).expect("project");
+        config.layout = Some(LayoutConfig {
+            gaps: Some(7),
+            ..LayoutConfig::default()
+        });
+        let changed = apply_config(&mut set, &config).expect("apply");
+        assert_eq!(changed.len(), 2, "both files own a `layout` node");
+        for path in &changed {
+            // `apply_config` edits the AST; writing to disk is the save path's
+            // job, so the change is checked in memory.
+            let text = set.file(path).expect("in the set").doc.to_string();
+            assert!(text.contains("gaps 7"), "{}: {text}", path.display());
+        }
+    }
+
+    #[test]
+    fn one_section_twice_in_one_file_is_an_error() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, "layout {\n  gaps 10\n}\nlayout {\n  gaps 20\n}\n").expect("write");
+        let set = load_config_set(&path).expect("load");
+        let err = to_config_with_report(&set).expect_err("niri rejects this");
+        assert!(err.to_string().contains("only once"), "{err}");
+    }
+
+    // --- D-5: renamed children are not "not understood" ---------------------
+
+    #[test]
+    fn renamed_children_are_not_reported_as_unknown() {
+        // All three are read by the engine; comparing the raw node name against
+        // the serde field name is what used to call them unknown.
+        let body = "cursor {\n  xcursor-theme \"Bibata\"\n  xcursor-size 24\n}\n\n\
+                    hotkey-overlay {\n  skip-at-startup\n}\n\n\
+                    blur {\n  on\n}\n";
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, body).expect("write");
+
+        let set = load_config_set(&path).expect("load");
+        let (config, report) = to_config_with_report(&set).expect("project");
+        assert!(report.unmapped.is_empty(), "{:?}", report.unmapped);
+
+        let cursor = config.cursor.as_ref().expect("cursor");
+        assert_eq!(cursor.theme.as_deref(), Some("Bibata"));
+        assert_eq!(cursor.size, Some(24));
+        assert_eq!(
+            config.hotkey_overlay.as_ref().and_then(|h| h.enabled),
+            Some(false),
+            "skip-at-startup means the overlay is off"
+        );
+        assert_eq!(config.blur.as_ref().and_then(|b| b.enabled), Some(true));
+    }
+
+    #[test]
+    fn a_genuinely_unknown_child_is_still_reported() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(
+            &path,
+            "layout {\n  gaps 10\n  custom-column-rule \"50%\"\n}\n",
+        )
+        .expect("write");
+        let set = load_config_set(&path).expect("load");
+        let (_, report) = to_config_with_report(&set).expect("project");
+        assert_eq!(report.unmapped.len(), 1, "{:?}", report.unmapped);
+        assert_eq!(report.unmapped[0].reason, NO_FIELD);
+        assert!(report.unmapped[0].raw.contains("custom-column-rule"));
+    }
+
+    // --- D-7: the preview is the node, not the comment above it -------------
+
+    #[test]
+    fn an_unmapped_preview_is_the_node_and_not_its_leading_comment() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        let body = "// a comment that belongs to the node below\n\
+                    window-rule {\n  geometry-corner-radius 12\n}\n";
+        std::fs::write(&path, body).expect("write");
+
+        let set = load_config_set(&path).expect("load");
+        let (_, report) = to_config_with_report(&set).expect("project");
+        let unmapped = report
+            .unmapped
+            .iter()
+            .chain(report.shadowed.iter())
+            .find(|u| u.line == 2)
+            .expect("the rule is on line 2");
+        assert!(
+            unmapped.raw.starts_with("window-rule"),
+            "preview is not the node: {:?}",
+            unmapped.raw
+        );
+        assert!(
+            !unmapped.raw.contains("a comment that belongs"),
+            "the leading decor leaked into the preview: {:?}",
+            unmapped.raw
+        );
+    }
+
+    // --- read path: names niri actually writes -------------------------------
+
+    #[test]
+    fn animation_names_are_read_the_way_niri_writes_them() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(
+            &path,
+            "animations {\n  slowdown 3.0\n  window-open {\n    duration-ms 200\n  }\n}\n",
+        )
+        .expect("write");
+        let set = load_config_set(&path).expect("load");
+        let (config, report) = to_config_with_report(&set).expect("project");
+        let animations = config.animations.as_ref().expect("animations");
+        assert_eq!(animations.slowdown, Some(3.0));
+        assert_eq!(
+            animations.window_open.as_ref().and_then(|a| a.duration),
+            Some(200)
+        );
+        assert!(report.unmapped.is_empty(), "{:?}", report.unmapped);
+    }
 }

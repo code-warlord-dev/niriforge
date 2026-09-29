@@ -93,7 +93,7 @@ fn every_fixture_round_trips_byte_for_byte() {
         // directly is still required, and is what the fixtures promise.
         let set = parse_config(&path).unwrap_or_else(|e| panic!("{label}: {e}"));
         let text = std::fs::read_to_string(&path).expect("fixture is readable");
-        let out = set.main.doc.to_string();
+        let out = set.main().doc.to_string();
         assert_eq!(out, text, "{label}: re-serialization is not byte-identical");
     }
 }
@@ -112,7 +112,7 @@ fn every_file_of_a_config_set_stays_in_its_own_file() {
     let main = Path::new(TESTDATA).join("multi-file/config.kdl");
     let set = parse_config(&main).expect("load");
     assert_eq!(
-        set.main.doc.to_string(),
+        set.main().doc.to_string(),
         std::fs::read_to_string(&main).unwrap()
     );
     for file in &set.files {
@@ -410,14 +410,14 @@ fn a_hash_prefixed_node_name_is_a_name_not_a_comment() {
     let path = Path::new(TESTDATA).join("unknown-blocks.kdl");
     let set = parse_config(&path).expect("load");
     let draft = set
-        .main
+        .main()
         .doc
         .nodes()
         .iter()
         .find(|n| n.name().value() == "#draft")
         .expect("#draft node");
     assert_eq!(
-        set.main.doc.to_string(),
+        set.main().doc.to_string(),
         std::fs::read_to_string(&path).unwrap()
     );
     assert!(draft.children().is_some());
@@ -466,7 +466,7 @@ fn no_comment_is_lost_or_reformatted() {
     let mut set = parse_config(&path).expect("load");
     let config = to_config(&set).expect("project");
     apply_config(&mut set, &config).expect("apply");
-    let after = set.main.doc.to_string();
+    let after = set.main().doc.to_string();
     assert_eq!(before, after);
 
     for line in before
@@ -478,20 +478,21 @@ fn no_comment_is_lost_or_reformatted() {
 }
 
 #[test]
-fn a_real_config_in_the_project_tree_reparses_100_percent() {
-    // Same property on the file that ships with niri: the largest, most
-    // comment-heavy config anyone is likely to open.
+fn the_fixture_niri_ships_reparses_byte_for_byte() {
+    // The file niri itself ships, which is the largest and most comment-heavy
+    // config anyone is likely to open. The user's own config is a separate,
+    // opt-in test further down; this one always runs.
     let path = Path::new(TESTDATA).join("default.kdl");
     let source = std::fs::read_to_string(&path).expect("readable");
     let set = parse_config(&path).expect("load");
-    assert_eq!(set.main.doc.to_string(), source, "not byte-identical");
+    assert_eq!(set.main().doc.to_string(), source, "not byte-identical");
 
-    let before_nodes = set.main.doc.nodes().len();
+    let before_nodes = set.main().doc.nodes().len();
     let (config, _) = to_config_with_report(&set).expect("project");
     let mut set = set;
     apply_config(&mut set, &config).expect("apply");
-    assert_eq!(set.main.doc.to_string(), source);
-    assert_eq!(set.main.doc.nodes().len(), before_nodes);
+    assert_eq!(set.main().doc.to_string(), source);
+    assert_eq!(set.main().doc.nodes().len(), before_nodes);
 }
 
 // --- projection specifics ---------------------------------------------------
@@ -718,7 +719,8 @@ fn changing_a_value_writes_only_the_file_that_owns_it() {
 fn the_entry_point_keeps_its_include_directives() {
     let main = Path::new(TESTDATA).join("cachyos-style/config.kdl");
     let set = parse_config(&main).expect("load");
-    let entries = niriforge_lib::kdl::include::extract_includes(&set.main.doc).expect("directives");
+    let entries =
+        niriforge_lib::kdl::include::extract_includes(&set.main().doc).expect("directives");
     assert_eq!(entries.len(), 5);
     assert_eq!(entries[0].path, "cfg/display.kdl");
     assert_eq!(entries[0].optional, None);
@@ -733,13 +735,13 @@ fn source_map_points_at_the_original_line_after_an_edit() {
     let mut set = parse_config(&main).expect("load");
 
     let layout = set
-        .main
+        .main()
         .doc
         .nodes()
         .iter()
         .find(|n| n.name().value() == "layout")
         .expect("layout node");
-    let id = set.source_map.node_id_for(&set.main.path, layout);
+    let id = set.source_map.node_id_for(&set.main_path, layout);
     // Line 1 is the file's own comment, line 2 is blank.
     let before = set.source_map.line_column(&id).expect("location");
     assert_eq!(before, (3, 1));
@@ -751,7 +753,7 @@ fn source_map_points_at_the_original_line_after_an_edit() {
         .expect("valid KDL")
         .to_string();
     set.source_map.store_document(
-        set.main.path.clone(),
+        set.main_path.clone(),
         niriforge_lib::kdl::parser::parse_kdl(&flattened, &main).expect("valid KDL"),
         &source,
     );
@@ -867,4 +869,59 @@ fn a_live_user_config_parses_and_reprints_byte_for_byte() {
         set.files.len(),
         report.unmapped.len()
     );
+}
+
+// --- a symlinked entry point -----------------------------------------------
+
+/// The `kdl-engine` skill lists "symlink on main config" among the mandatory
+/// cases, and it is the one that catches a save going to the link instead of
+/// the file: a config reached through a symlink has to be written to the file
+/// the symlink points at, or the write lands somewhere niri never reads.
+///
+/// Unix only: creating a symlink needs privileges and a filesystem that has
+/// them, and CI for this project is Linux.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_entry_point_resolves_to_the_real_file() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let real_dir = dir.path().join("real");
+    std::fs::create_dir_all(&real_dir).expect("mkdir");
+    std::fs::write(real_dir.join("config.kdl"), "include \"extra.kdl\"\n").expect("write");
+    std::fs::write(real_dir.join("extra.kdl"), "layout {\n  gaps 3\n}\n").expect("write");
+
+    let link = dir.path().join("link.kdl");
+    std::os::unix::fs::symlink(real_dir.join("config.kdl"), &link).expect("symlink");
+
+    let set = parse_config(&link).expect("load through the symlink");
+
+    // Everything is keyed by the canonical path, so the symlink itself never
+    // appears: a write to it would create a second file next to the real one.
+    let real_config = std::fs::canonicalize(real_dir.join("config.kdl")).expect("canonical");
+    let real_extra = std::fs::canonicalize(real_dir.join("extra.kdl")).expect("canonical");
+    assert_eq!(set.main_path, real_config);
+    assert_eq!(set.main().path, real_config);
+    assert_eq!(set.paths(), vec![real_config.clone(), real_extra.clone()]);
+    assert!(
+        set.paths()
+            .iter()
+            .all(|p| !p.starts_with(dir.path().to_str().unwrap().to_owned() + "/link")),
+        "the link path leaked into the set: {:?}",
+        set.paths()
+    );
+
+    // An edit goes to the real file, not to the link.
+    let mut set = set;
+    let mut config = to_config(&set).expect("project");
+    config.layout = Some(niriforge_lib::schema::LayoutConfig {
+        gaps: Some(9),
+        ..niriforge_lib::schema::LayoutConfig::default()
+    });
+    let changed = apply_config(&mut set, &config).expect("apply");
+    assert_eq!(changed, vec![real_extra.clone()]);
+    assert!(set
+        .file(&real_extra)
+        .expect("in the set")
+        .doc
+        .to_string()
+        .contains("gaps 9"));
 }
