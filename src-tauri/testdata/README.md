@@ -39,3 +39,22 @@ parse with a different message and a span pointing into the file.
   `border { off; }` parses, `border { off }` does not.
 - `/-` takes no `-/` terminator. Each one hides exactly one node, so two
   disabled children need two of them.
+
+## Who runs these
+
+`src-tauri/tests/kdl_engine.rs`. It loads every file here, projects it into the
+typed model, applies the model back and compares the result with the bytes on
+disk. Anything that came out different is a bug, including a comment that moved.
+
+Two things the fixtures pin down that are easy to get wrong:
+
+- A `/-` node is not a node. The KDL parser folds it into the leading decor of
+  the node that follows, which is why `commented-out.kdl` survives a save even
+  though nothing ever looks at those entries.
+- An include path is relative to the file that contains the directive, not to
+  `config.kdl`. `cachyos-style/` is the fixture that fails first if that is
+  implemented the other way round.
+
+A test for a config outside this directory - a real one, for instance - is run
+only when `NIRIFORGE_TEST_CONFIG` names one, and it never writes.
+
