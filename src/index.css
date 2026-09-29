@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors — DESIGN-SYSTEM.md (dark-first) */
+  --color-background: #0f1115;
+  --color-foreground: #f3f4f6;
+
+  --color-surface: #161922;
+  --color-surface-card: #1e222d;
+  --color-surface-hover: #282e3d;
+
+  --color-border: #2e3444;
+  --color-border-subtle: #232733;
+
+  --color-primary: #3b82f6;
+  --color-primary-hover: #60a5fa;
+  --color-primary-foreground: #ffffff;
+
+  --color-success: #10b981;
+  --color-success-foreground: #0f1115;
+
+  --color-warning: #f59e0b;
+  --color-warning-foreground: #0f1115;
+
+  --color-danger: #ef4444;
+  --color-danger-foreground: #ffffff;
+
+  --color-muted: #1e222d;
+  --color-muted-foreground: #6b7280;
+
+  --color-ring: #3b82f6;
+
+  --color-mono-accent: #38bdf8;
+
+  /* Typography */
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --text-base: 13px;
+  --text-sm: 12px;
+  --text-xs: 11px;
+  --text-lg: 14px;
+  --text-xl: 15px;
+  --text-2xl: 20px;
+
+  /* Spacing & Density */
+  --space-gutter: 0.75rem;
+  --space-margin: 1rem;
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+
+  /* Rounded */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Component defaults */
+  --default-transition: 150ms ease;
+}
+
+/* CSS Variables for direct use (shadcn/ui compatible) */
+:root {
+  --background: #0f1115;
+  --foreground: #f3f4f6;
+  --sidebar: #161922;
+  --card: #1e222d;
+  --card-hover: #282e3d;
+  --border: #2e3444;
+  --border-subtle: #232733;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-foreground: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --muted: #1e222d;
+  --muted-foreground: #6b7280;
+  --ring: #3b82f6;
+  --mono-accent: #38bdf8;
+  --radius: 0.25rem;
+}
+
+/* Base styles */
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* shadcn/ui compatible utility classes */
+.container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--space-margin);
+}
+
+@media (min-width: 640px) {
+  .container { max-width: 640px; }
+}
+@media (min-width: 768px) {
+  .container { max-width: 768px; }
+}
+@media (min-width: 1024px) {
+  .container { max-width: 1024px; }
+}
+@media (min-width: 1280px) {
+  .container { max-width: 1280px; }
+}
+@media (min-width: 1536px) {
+  .container { max-width: 1536px; }
+}
+
+/* Utility classes for design system tokens */
+.bg-background { background-color: var(--background); }
+.bg-foreground { background-color: var(--foreground); }
+.bg-sidebar { background-color: var(--sidebar); }
+.bg-card { background-color: var(--card); }
+.bg-card-hover { background-color: var(--card-hover); }
+.bg-muted { background-color: var(--muted); }
+.bg-primary { background-color: var(--primary); }
+.bg-primary-hover { background-color: var(--primary-hover); }
+.bg-success { background-color: var(--success); }
+.bg-warning { background-color: var(--warning); }
+.bg-danger { background-color: var(--danger); }
+
+.text-foreground { color: var(--foreground); }
+.text-muted-foreground { color: var(--muted-foreground); }
+.text-primary { color: var(--primary); }
+.text-primary-foreground { color: var(--primary-foreground); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger { color: var(--danger); }
+.text-mono-accent { color: var(--mono-accent); }
+
+.border-border { border-color: var(--border); }
+.border-subtle { border-color: var(--border-subtle); }
+.border-ring { border-color: var(--ring); }
+
+.font-sans { font-family: var(--font-sans); }
+.font-mono { font-family: var(--font-mono); }
+
+.text-base { font-size: var(--text-base); }
+.text-sm { font-size: var(--text-sm); }
+.text-xs { font-size: var(--text-xs); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-2xl { border-radius: var(--radius-2xl); }
+.rounded-full { border-radius: var(--radius-full); }
+
+.transition-default { transition: all var(--default-transition); }
