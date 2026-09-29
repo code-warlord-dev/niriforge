@@ -31,11 +31,11 @@
 
 **Цель:** выровнять UI shell под DESIGN-SYSTEM: палитра, density, header, toasts, empty state — без demo данных.
 
-- [ ] Токены: DESIGN-SYSTEM.md → src/index.css (dark-first: `#0f1115`, `#161922`, `#1e222d`, `#2e3444`, Inter + JetBrains Mono, 13px)
-- [ ] Toasts: ToastContainer + uiStore.addToast (success `#10b981`, warning `#f59e0b`, danger `#ef4444`)
-- [ ] Header: path + dirty dot + Validate + Save (Validate активна, toast error от stub)
-- [ ] EmptyState: кнопка Browse… → Tauri dialog (отдельный PR после tokens+toasts+header)
-- [ ] Убрать дубль title «NiriForge» в Sidebar
+- [x] Токены: DESIGN-SYSTEM.md → src/index.css (dark-first: `#0f1115`, `#161922`, `#1e222d`, `#2e3444`, Inter + JetBrains Mono, 13px)
+- [x] Toasts: ToastContainer + uiStore.addToast (success `#10b981`, warning `#f59e0b`, danger `#ef4444`)
+- [x] Header: path + dirty dot + Validate + Save (Validate активна, toast error от stub)
+- [x] EmptyState: кнопка Browse… → Tauri dialog
+- [x] Убрать дубль title «NiriForge» в Sidebar
 
 **Критерий готовности:**
 - `pnpm tauri dev` → окно: цвета/типографика/density shell по DESIGN-SYSTEM
