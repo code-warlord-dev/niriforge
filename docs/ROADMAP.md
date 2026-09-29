@@ -50,11 +50,17 @@
 **Цель:** надёжная загрузка/сохранение/валидация + минимальный UI.
 
 ### Веха 1.1 — KDL Engine
-- Парсер + serializer на `kdl` crate.
-- Include resolver (глубина, cycles, optional includes).
-- Source-map (node → file + span).
-- Сохранение комментариев и неизвестных блоков (максимально возможно).
-- Round-trip тесты на реальных конфигах (в т.ч. CachyOS/Noctalia style).
+- [x] Парсер + serializer на `kdl` crate.
+- [x] Include resolver (глубина, cycles, optional includes).
+- [x] Source-map (node → file + span).
+- [x] Сохранение комментариев и неизвестных блоков (максимально возможно).
+- [x] Round-trip тесты на реальных конфигах (в т.ч. CachyOS/Noctalia style).
+
+> Веха не закрыта: движок читает конфиг, но не пишет его. Пункт 5 спеки
+> (Config + source-map → обновлённые файлы) и второй критерий приёмки
+> (load → save → минимальный diff) уходят в веху 1.2 вместе с atomic write
+> и бэкапами. `apply_config` сейчас правит только уже существующие ноды:
+> `screenshot-path`, `prefer-no-csd`, `layout.gaps`, `blur` on/off.
 
 ### Веха 1.2 — FS & Safety
 - Resolve symlink.
