@@ -91,13 +91,3 @@ impl Default for BackupManager {
         Self::new().expect("BackupManager::new should not fail in default")
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_backup_module_exists() {
-        assert!(true);
-    }
-}

@@ -2,10 +2,10 @@
 
 pub mod commands;
 pub mod error;
-pub mod schema;
+pub mod fs;
 pub mod kdl;
 pub mod niri;
-pub mod fs;
+pub mod schema;
 
 use crate::commands::*;
 

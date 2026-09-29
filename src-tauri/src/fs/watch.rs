@@ -42,16 +42,8 @@ impl ConfigWatcher {
 
 /// Create a watcher for a set of paths.
 #[allow(dead_code, unused_variables)]
-fn create_watcher(paths: &[&Path]) -> AppResult<(RecommendedWatcher, mpsc::Receiver<notify::Result<Event>>)> {
+fn create_watcher(
+    paths: &[&Path],
+) -> AppResult<(RecommendedWatcher, mpsc::Receiver<notify::Result<Event>>)> {
     Err(AppError::other("Not implemented yet"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_watch_module_exists() {
-        assert!(true);
-    }
 }

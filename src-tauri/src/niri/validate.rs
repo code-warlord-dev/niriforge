@@ -20,13 +20,3 @@ pub async fn validate_config_content(config_content: &str) -> AppResult<Vec<Vali
 fn parse_niri_validate_output(output: &str) -> Vec<ValidationError> {
     Vec::new()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate_module_exists() {
-        assert!(true);
-    }
-}

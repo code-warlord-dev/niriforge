@@ -1,9 +1,9 @@
 //! File system operations: atomic write, symlink resolution, watching, backups.
 
 pub mod atomic;
-pub mod watch;
 pub mod backup;
 pub mod paths;
+pub mod watch;
 
 use crate::error::{AppError, AppResult};
 use std::path::PathBuf;
@@ -36,14 +36,4 @@ pub fn read_file(path: &PathBuf) -> AppResult<String> {
 #[allow(dead_code, unused_variables, clippy::ptr_arg)]
 pub async fn write_file_atomic(path: &PathBuf, content: &str) -> AppResult<()> {
     Err(AppError::other("Not implemented yet"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fs_module_exists() {
-        assert!(true);
-    }
 }

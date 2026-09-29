@@ -4,8 +4,8 @@ use crate::error::{AppError, AppResult};
 use crate::kdl::source_map::SourceMap;
 use crate::schema::IncludeEntry;
 use kdl::KdlDocument;
-use std::path::{Path, PathBuf};
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 /// Maximum include depth to prevent cycles.
 #[allow(dead_code)]
@@ -43,14 +43,4 @@ pub fn extract_includes(doc: &KdlDocument) -> Vec<IncludeEntry> {
 #[allow(dead_code, unused_variables)]
 pub fn resolve_include_path(base: &Path, include_path: &str) -> PathBuf {
     base.parent().unwrap_or(base).join(include_path)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_include_module_exists() {
-        assert!(true);
-    }
 }
