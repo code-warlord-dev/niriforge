@@ -1,0 +1,22 @@
+// Key bindings, split off into their own file.
+
+binds {
+    Mod+Q repeat=false { close-window; }
+    Mod+W { toggle-overview; }
+
+    Mod+Left  { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-up; }
+
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+Shift+1 { move-window-to-workspace 1; }
+
+    XF86AudioRaiseVolume allow-when-locked=true {
+        spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.05+"
+    }
+    XF86AudioLowerVolume allow-when-locked=true {
+        spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.05-"
+    }
+}

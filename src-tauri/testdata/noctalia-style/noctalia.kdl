@@ -1,0 +1,10 @@
+// Settings for the status bar. Included from the top-level file, which itself
+// is reached through an optional include.
+
+include "cfg/noctalia-bar.kdl"
+
+layer-rule {
+    match namespace=r#"^noctalia-bar$"#
+    place-within-backdrop true
+    opacity 0.95
+}

@@ -1,0 +1,13 @@
+// The bar itself. This file is only read when noctalia-style/config.kdl is
+// present, which is the point of the optional include.
+
+layout {
+    gaps 8
+    struts {
+        top 32
+    }
+}
+
+environment {
+    NIRIFORGE_BAR "noctalia"
+}

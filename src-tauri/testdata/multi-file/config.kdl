@@ -1,0 +1,9 @@
+// Main entry point. Everything else lives in includes/.
+//
+// Covers: a main file that is nothing but includes, in a subdirectory, with
+// each included file being a valid config on its own.
+
+include "includes/outputs.kdl"
+include "includes/layout.kdl"
+include "includes/binds.kdl"
+include "includes/rules.kdl"

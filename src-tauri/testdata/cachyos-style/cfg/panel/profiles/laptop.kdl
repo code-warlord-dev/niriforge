@@ -1,0 +1,12 @@
+// Monitor profile for the laptop panel.
+
+output "eDP-1" {
+    mode "1920x1080@60.000"
+    scale 1
+    position x=0 y=0
+}
+
+// The internal panel stays off while the lid is closed.
+/-output "eDP-1" {
+    off
+}

@@ -1,0 +1,213 @@
+// Round-trip fixture: a config that is all about formatting.
+// Every comment, blank line and odd indent below must survive a load/save cycle
+// byte for byte. Nothing here is pretty on purpose.
+
+// ---------------------------------------------------------------------------
+// Inputs
+// ---------------------------------------------------------------------------
+
+input {
+        keyboard {   // inconsistent indentation on purpose
+                xkb {
+                        /* A block comment
+                           that spans
+                           several lines. */
+                        layout "us,ru" // trailing comment
+                        options "grp:alt_shift_toggle,caps:escape"
+                        rules ""
+                        model ""
+                        variant ""
+                }
+                numlock
+        }
+
+    // A comment that belongs to the touchpad node, not to any of its children.
+
+    touchpad {
+        tap
+
+        // Leading comment for a single child.
+        natural-scroll
+
+        /* Inline block comment */ dwt
+
+        // Comment between children, with a blank line after it.
+
+        accel-speed 0.3
+    }
+
+        mouse {
+                // off
+                natural-scroll
+        }
+}
+
+
+// Two blank lines, then a leading block comment for the next node.
+/* -------------------------------------------------------------------- */
+
+output "eDP-1" {
+    // Prefer the low refresh rate on battery.
+    mode "1920x1080@60.000" // trailing comment inside a child block
+    scale 1
+
+    // The position is documented by the comment right above it.
+    position x=0 y=0
+}
+
+/* Block comment instead of a line comment. */
+output "HDMI-A-1" {
+    mode "2560x1440@144.000"
+    scale 1.5
+    transform "normal"
+}
+
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+layout {
+    gaps 12 /* gaps are logical pixels */
+
+        center-focused-column "on-overflow"
+
+    focus-ring {
+        width 2
+        active-color "#88c0d0"
+        inactive-color "#4c566a" // dimmer while another monitor has focus
+    }
+
+        // A bare child in a one-line block needs an explicit `;` terminator.
+        border { off; }
+
+    // Struts matter when a panel is docked.
+    struts {
+        // top 32
+    }
+}
+
+// The section above is enabled on purpose.
+/-prefer-no-csd
+
+screenshot-path "~/Pictures/Screenshots/shot-%Y%m%d-%H%M%S.png" // strftime
+
+// ---------------------------------------------------------------------------
+// Environment
+// ---------------------------------------------------------------------------
+
+environment {
+    NIRIFORGE_ALPHA "first"
+    NIRIFORGE_BETA "value with spaces"   /* inline block */ // trailing comment
+}
+
+// A second `environment` node in the same file is not accepted by niri, so
+// this one stays commented out. NiriForge has to keep it as written.
+ /-environment {
+    NIRIFORGE_UNUSED "x"
+}
+
+// ---------------------------------------------------------------------------
+// Rules
+// ---------------------------------------------------------------------------
+
+// Raw strings keep backslashes verbatim, which is why the config uses them.
+window-rule {
+    match app-id=r#"^org\.example\.Demo$"#  // exact match on the app id
+    match title=r#"^Inbox — .*"#
+    open-floating true
+    default-column-width { proportion 0.6; }
+}
+
+window-rule {
+    match app-id=r#"^steam$"#
+
+    // Password managers stay out of screenshots.
+    block-out-from "screen-capture"
+}
+
+layer-rule {
+    match namespace=r#"^backdrop$"#
+    place-within-backdrop true
+    opacity 0.9 // faded, so the desktop stays readable
+}
+
+workspace "browser" {
+    open-on-output "eDP-1"
+}
+
+workspace "code"
+
+// ---------------------------------------------------------------------------
+// Binds
+// ---------------------------------------------------------------------------
+
+binds {
+    Mod+Q repeat=false { close-window; } // quit
+    Mod+Shift+Q { spawn-sh "loginctl terminate-session \"$XDG_SESSION_ID\""; }
+
+    /* A block comment in the middle
+       of the bind block. */
+    Mod+W { toggle-overview; }
+
+    Mod+Left  { focus-column-left; }
+    Mod+Right { focus-column-right; }
+
+    Mod+1 { focus-workspace 1; } // first workspace
+    Mod+2 { focus-workspace 2; }
+
+    // A block comment in front of a line continuation, then the block below.
+    // (A `//` comment between the continuation and the next line is rejected
+    // by niri's parser, so the comment has to sit on the same line.)
+    Mod+Ctrl+Return /* opens a terminal */ \
+        { spawn "footclient"; }
+
+    // A spawn with separate arguments instead of a shell.
+    XF86AudioRaiseVolume allow-when-locked=true {
+        spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.05+"
+    }
+
+    XF86AudioLowerVolume allow-when-locked=true {
+        spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.05-"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Startup and the rest
+// ---------------------------------------------------------------------------
+
+spawn-at-startup "waybar"
+spawn-sh-at-startup "systemctl --user import-environment WAYLAND_DISPLAY"
+
+switch-events {
+    tablet-mode-on { spawn "true"; }
+    tablet-mode-off { spawn "true"; }
+}
+
+hotkey-overlay {
+    // skip-at-startup
+}
+
+animations {
+    slowdown 1.2
+}
+
+blur {
+    on
+    passes 2
+    noise 0.02
+}
+
+overview {
+    zoom 0.6
+    workspace-shadow { softness 40; }
+}
+
+xwayland-satellite {
+    path "xwayland-satellite"
+}
+
+clipboard {
+    // disable-primary
+}
+
+// The last line ends with a trailing comment and no newline tricks.

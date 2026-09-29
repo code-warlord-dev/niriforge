@@ -1,0 +1,13 @@
+// A config that keeps optional pieces behind `include optional=true`, the way
+// a machine-specific setup usually does: the piece is used when the file is
+// there and skipped when it is not.
+//
+// config.kdl -> noctalia.kdl -> cfg/noctalia-bar.kdl  (optional, may be absent)
+// config.kdl -> cfg/shell.kdl
+
+include "cfg/shell.kdl"
+
+include optional=true "noctalia.kdl"
+
+// Deliberately missing: the loader must not treat this as an error.
+include optional=true "cfg/absent.kdl"

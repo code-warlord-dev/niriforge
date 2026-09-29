@@ -1,0 +1,25 @@
+// Layout, split off into its own file.
+
+layout {
+    gaps 12
+    center-focused-column "on-overflow"
+
+    focus-ring {
+        width 2
+        active-color "#88c0d0"
+        inactive-color "#4c566a"
+    }
+
+    border { off; }
+
+    shadow {
+        softness 30
+        spread 5
+        offset x=0 y=5
+        color "#0007"
+    }
+
+    struts {
+        top 32
+    }
+}

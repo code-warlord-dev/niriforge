@@ -1,0 +1,17 @@
+// Odds and ends that do not deserve a file of their own.
+
+spawn-at-startup "waybar"
+
+hotkey-overlay {
+    // skip-at-startup
+}
+
+screenshot-path "~/Pictures/Screenshots/shot-%Y%m%d-%H%M%S.png"
+
+animations {
+    slowdown 1.5
+}
+
+overview {
+    zoom 0.55
+}

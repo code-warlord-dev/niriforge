@@ -1,0 +1,103 @@
+// Round-trip fixture: commented-out nodes.
+//
+// niri's parser treats "/-" as "ignore the single node that follows". There is
+// no "-/" terminator, so every "/-" below stands on its own and comments out
+// exactly one node. All of it has to survive a load/save cycle untouched.
+
+// ---------------------------------------------------------------------------
+// Commented-out top-level nodes
+// ---------------------------------------------------------------------------
+
+// A whole output block, spread over several lines.
+/-output "DP-2" {
+    mode "2560x1440@75.000"
+    scale 1
+    position x=1920 y=0
+}
+
+// A single-argument node.
+/-spawn-at-startup "polybar"
+
+// A bare flag node.
+/-prefer-no-csd
+
+// Two nodes in a row, each with its own "/-".
+/-spawn-at-startup "wofi"
+/-spawn-sh-at-startup "notify-send ready"
+
+// A window rule, complete with a raw string.
+/-window-rule {
+    match app-id=r#"^org\.example\.Old$"#
+    open-floating true
+}
+
+// An "/-" inside an already commented-out node is just text to the parser.
+/-output "DP-3" {
+    /-mode "1280x720@60.000"
+    /-transform "90"
+
+    scale 1.5
+}
+
+// ---------------------------------------------------------------------------
+// Commented-out children inside a live section
+// ---------------------------------------------------------------------------
+
+layout {
+    gaps 10
+
+    // One disabled child.
+    /-center-focused-column "always"
+
+    // A disabled child with its own block. It needs its own "/-"; a single
+    // "/-" never covers two children.
+    /-focus-ring {
+        width 8
+        active-color "#ff0000"
+    }
+    /-border {
+        off
+        width 1
+    }
+
+    focus-ring {
+        width 2
+        active-color "#88c0d0"
+    }
+}
+
+input {
+    keyboard {
+        xkb {
+            layout "us,ru"
+        }
+    }
+
+    touchpad {
+        tap
+        /-dwt
+        natural-scroll
+    }
+}
+
+binds {
+    Mod+Q { close-window; }
+
+    // A disabled bind sitting between two live ones.
+    /-Mod+1 { focus-workspace 1; }
+
+    Mod+2 { focus-workspace 2; }
+}
+
+/* A block comment between a comment-out and the next node. */
+
+// A whole section, disabled.
+/-binds {
+    Mod+Q { close-window; }
+    Mod+W { toggle-overview; }
+}
+
+// The last live node of the file follows a comment-out directly.
+environment {
+    NIRIFORGE_COMMENTED_OUT "kept"
+}

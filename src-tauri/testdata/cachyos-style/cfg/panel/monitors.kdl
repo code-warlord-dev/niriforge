@@ -1,0 +1,11 @@
+// Monitors. The per-machine profiles are split off again, so the include tree
+// reaches four levels deep.
+
+include "profiles/laptop.kdl"
+include "profiles/desktop.kdl"
+
+blur {
+    on
+    passes 2
+    noise 0.02
+}
