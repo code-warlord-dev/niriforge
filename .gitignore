@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+src-tauri/target/
+src-tauri/gen/
+
+# Tauri
+src-tauri/*.app
+src-tauri/*.dmg
+src-tauri/*.deb
+src-tauri/*.AppImage
+src-tauri/*.msi
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor
+*.sublime-project
+*.sublime-workspace
+
+# Misc
+*.pem
+.cache/
+.vercel
+.netlify
+# Agent / AI tooling (never commit)
+.stealth-agent/
+.agent-workspace/
+.agents/
+AGENTS.md
+STATE.md
+.cursorrules
+CLAUDE.md
+.windsurfrules
+.aider*
+.cursor/
+.claude/
