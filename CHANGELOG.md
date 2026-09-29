@@ -5,6 +5,30 @@ All notable changes to NiriForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] — 2026-09-30
+
+KDL engine, milestone 1.1 of the phase 1 plan.
+
+### Added
+
+- **Include resolver**: `KdlConfigSet` holds the entry point and every file it pulls in. Relative, absolute and `~/` paths resolve against the file that contains the directive; `optional=true` on a missing file is not an error; cycles are detected on canonicalized paths; the depth limit is 10, the same value niri uses.
+- **Include tree** and a source map covering every file in the set, so any node resolves to its own file, byte span and line/column.
+- **AST ↔ typed `Config`**: `parse_config` → `to_config` (with a report of unmapped nodes) and `apply_config` back onto the node tree.
+- **Round-trip fixtures**: 22 KDL files under `src-tauri/testdata/` — the niri default config, comment-heavy and `/-` commented-out configs, unknown top-level blocks, and three multi-file layouts up to four levels deep, including CachyOS and Noctalia style trees. `src-tauri/testdata/README.md` describes each case.
+
+### Fixed
+
+- KDL module compiles again; the tests had been written against an API of the `kdl` crate that does not exist in 4.7.1.
+- Parse errors carry file, line, column and byte offset.
+- Serialization no longer runs through the `kdl` pretty-printer. It rewrote the user's decor: dropped blank lines, re-indented comments, normalized CRLF and panicked on unusual decor. Rendering goes through `Display` instead, and an unedited file serializes byte-for-byte.
+- Source map pointed at the pre-edit line after `apply_config` touched a document, and could resolve to the wrong file when two files shared an offset.
+
+### Known limitations
+
+- The engine does not write files. `serialize_file` / `serialize_all` return text; the load path works end to end, saving is milestone 1.2.
+- `apply_config` only writes fields that already have a node in the document: `screenshot-path`, `prefer-no-csd`, `layout.gaps` and `blur` on/off. It will not add a node that is not there.
+- Consequently, acceptance item 1.3 of the phase 1 spec — change a field, save, confirm with `niri validate` — is not done yet. The `blur` toggle was checked in both directions with `niri validate`, but that is not the same as a save path.
+
 ## [0.1.4] — 2026-09-29
 
 ### Changed
