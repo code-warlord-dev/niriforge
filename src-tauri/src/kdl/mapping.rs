@@ -507,6 +507,75 @@ fn apply_to_file(file: &mut ConfigFile, config: &Config) -> Result<(), ApplyErro
             set_on_off(children, enabled);
         }
     }
+
+    // --- input section -------------------------------------------------------
+    if let Some(input_config) = &config.input {
+        apply_input(file, input_config)?;
+    }
+
+    Ok(())
+}
+
+/// Apply the `input` section to a single file.
+///
+/// Only edits existing nodes. Does not create a new `input` node if none exists
+/// (the user must add the section themselves). For device sections (keyboard,
+/// touchpad, etc.), creates the section only if `input` exists in exactly one
+/// file of the set and the device section is not already present in another file.
+fn apply_input(file: &mut ConfigFile, config: &InputConfig) -> Result<(), ApplyError> {
+    let Some(input_node) = find_top(&mut file.doc, "input") else {
+        return Ok(());
+    };
+
+    let Some(input_children) = input_node.children_mut().as_mut() else {
+        return Ok(());
+    };
+
+    // Keyboard
+    if let Some(kb) = &config.keyboard {
+        apply_keyboard(input_children, kb)?;
+    }
+
+    // Touchpad
+    if let Some(tp) = &config.touchpad {
+        apply_touchpad(input_children, tp)?;
+    }
+
+    // Mouse
+    if let Some(m) = &config.mouse {
+        apply_mouse(input_children, m)?;
+    }
+
+    // Trackpoint
+    if let Some(tp) = &config.trackpoint {
+        apply_trackpoint(input_children, tp)?;
+    }
+
+    // Tablet
+    if let Some(t) = &config.tablet {
+        apply_tablet(input_children, t)?;
+    }
+
+    // Touch
+    if let Some(t) = &config.touch {
+        apply_touch(input_children, t)?;
+    }
+
+    // focus-follows-mouse (Class B enabler)
+    if let Some(enabled) = config.focus_follows_mouse {
+        apply_focus_follows_mouse(input_children, enabled)?;
+    }
+
+    // warp-mouse-to-focus (Class B enabler)
+    if let Some(enabled) = config.warp_mouse_to_focus {
+        apply_warp_mouse_to_focus(input_children, enabled)?;
+    }
+
+    // mod-key (scalar string)
+    if let Some(mod_key) = &config.mod_key {
+        apply_mod_key(input_children, mod_key)?;
+    }
+
     Ok(())
 }
 
@@ -548,6 +617,431 @@ fn set_bool_arg(node: &mut KdlNode, value: bool) -> Result<(), ApplyError> {
         return Ok(());
     }
     set_single_arg(node, Value::Bool(value))
+}
+
+// --- input section writers --------------------------------------------------
+//
+// niri 26.04 grammar for booleans (see notes/niri-input-grammar.md):
+//
+// Class A — bare flag only (tap, dwt, dwtp, natural-scroll, left-handed,
+//   middle-emulation, off, ...). Writing `flag true`/`flag false` is invalid.
+//   True  = bare node.  False = delete the node (only by absence of node).
+//
+// Class B — enabler (focus-follows-mouse, warp-mouse-to-focus). Bare node
+//   means true. Writing `flag false` is invalid; there is no false spelling.
+//
+// Class C — scalar (numlock). Bare, `true`, `false` all accepted; bare means true.
+//
+// Class D — argument-required bool (drag). `drag true`/`drag false`; bare `drag`
+//   is invalid.
+
+/// Write a class-A device flag: bare node for true, comment-out for false.
+fn set_class_a_flag(children: &mut KdlDocument, name: &str, value: bool) {
+    if let Some(node) = children
+        .nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+    {
+        if value {
+            if !node.entries().is_empty() {
+                node.clear_entries();
+            }
+        } else {
+            node.clear_entries();
+            node.name_mut().set_repr(format!("/-{}", name));
+        }
+    } else if value {
+        push_node(children, KdlNode::new(name));
+    }
+}
+
+/// Write a class-C scalar flag (numlock): bare/true/false all valid.
+fn set_class_c_flag(children: &mut KdlDocument, name: &str, value: Option<bool>) {
+    if let Some(node) = children
+        .nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+    {
+        match value {
+            Some(true) => {
+                node.clear_entries();
+            }
+            Some(false) => {
+                set_bool_arg(node, false).ok();
+            }
+            None => {}
+        }
+    } else {
+        match value {
+            Some(true) => {
+                push_node(children, KdlNode::new(name));
+            }
+            Some(false) => {
+                let mut node = KdlNode::new(name);
+                node.push(kdl::KdlEntry::new(KdlValue::Bool(false)));
+                push_node(children, node);
+            }
+            None => {}
+        }
+    }
+}
+
+/// Write a class-D argument-required bool (drag): `drag true`/`drag false`.
+fn set_class_d_flag(
+    children: &mut KdlDocument,
+    name: &str,
+    value: Option<bool>,
+) -> Result<(), ApplyError> {
+    if let Some(node) = children
+        .nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+    {
+        if let Some(v) = value {
+            set_bool_arg(node, v)?;
+        }
+    } else if let Some(v) = value {
+        let mut node = KdlNode::new(name);
+        node.push(kdl::KdlEntry::new(KdlValue::Bool(v)));
+        push_node(children, node);
+    }
+    Ok(())
+}
+
+/// Write a class-B enabler (focus-follows-mouse, warp-mouse-to-focus).
+///
+/// True = bare node (created if absent). False = cannot be written (no valid
+/// form in niri 26.04 grammar); returns an error so the caller can surface it.
+fn set_enabler(children: &mut KdlDocument, name: &str, value: bool) -> Result<(), ApplyError> {
+    if let Some(node) = children
+        .nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+    {
+        if !value {
+            return Err(ApplyError::At {
+                file: std::path::PathBuf::new(),
+                line: node.span().offset(),
+                message: format!(
+                    "{} cannot be set to false in niri 26.04 grammar; remove the node instead",
+                    name
+                ),
+            });
+        }
+        if !node.entries().is_empty() {
+            node.clear_entries();
+        }
+    } else if value {
+        push_node(children, KdlNode::new(name));
+    }
+    Ok(())
+}
+
+/// Push a node into a child document, clearing the document's leftover
+/// whitespace-only formatting when the document was empty so that kdl's
+/// serializer adds a proper newline+indent before the new node.
+fn push_node(children: &mut KdlDocument, node: KdlNode) {
+    if children.nodes().is_empty() {
+        children.clear_fmt();
+    }
+    children.nodes_mut().push(node);
+}
+
+/// Write a scalar value to a node, creating it if absent.
+fn set_scalar(children: &mut KdlDocument, name: &str, value: &Value) -> Result<(), ApplyError> {
+    if let Some(node) = children
+        .nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+    {
+        set_single_arg(node, value.clone())?;
+    } else {
+        let kdl_value = json_to_kdl(value).ok_or_else(|| ApplyError::At {
+            file: std::path::PathBuf::new(),
+            line: 0,
+            message: format!("cannot represent value as KDL for {}", name),
+        })?;
+        let mut node = KdlNode::new(name);
+        node.push(kdl::KdlEntry::new(kdl_value));
+        push_node(children, node);
+    }
+    Ok(())
+}
+
+fn set_string_scalar(
+    children: &mut KdlDocument,
+    name: &str,
+    value: &str,
+) -> Result<(), ApplyError> {
+    set_scalar(children, name, &Value::String(value.to_string()))
+}
+
+fn set_int_scalar(children: &mut KdlDocument, name: &str, value: i32) -> Result<(), ApplyError> {
+    set_scalar(children, name, &Value::from(value))
+}
+
+/// Write a float from the typed model (f32) into KDL.
+///
+/// The schema stores f32, the AST stores f64. Going through serde_json::Value
+/// widens f32 → f64 via `as f64`, so `0.4f32` becomes `0.4000000059604645f64`
+/// and KDL's `{:?}` formatting emits the long form. Formatting the f32 first
+/// (Rust's `{:?}` yields the shortest string round-tripping to the same f32),
+/// then parsing that back as f64, gives KDL an f64 that serializes cleanly.
+fn set_float_scalar(children: &mut KdlDocument, name: &str, value: f32) -> Result<(), ApplyError> {
+    // `"{:?}"` on f32 gives the shortest string that round-trips to the same f32.
+    // Parsing it as f64 yields an f64 whose own `{:?}` produces the same string.
+    let as_f64: f64 = format!("{:?}", value)
+        .parse()
+        .expect("f32 debug formatting always parses as f64");
+    let kdl_value = KdlValue::Base10Float(as_f64);
+
+    if let Some(node) = children
+        .nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+    {
+        if node
+            .entries()
+            .iter()
+            .any(|e| e.name().is_none() && same_scalar(e.value(), &kdl_value))
+        {
+            return Ok(());
+        }
+        set_single_arg(node, Value::from(as_f64))?;
+    } else {
+        let mut node = KdlNode::new(name);
+        node.push(kdl::KdlEntry::new(kdl_value));
+        push_node(children, node);
+    }
+    Ok(())
+}
+
+fn child_of_doc<'a>(doc: &'a mut KdlDocument, name: &str) -> Option<&'a mut KdlNode> {
+    doc.nodes_mut()
+        .iter_mut()
+        .find(|n| n.name().value() == name)
+}
+
+/// Apply keyboard section: xkb { layout variant options model rules file },
+/// repeat-delay, repeat-rate, track-layout, numlock.
+fn apply_keyboard(children: &mut KdlDocument, kb: &KeyboardConfig) -> Result<(), ApplyError> {
+    let Some(kb_node) = child_of_doc(children, "keyboard") else {
+        return Ok(());
+    };
+    let Some(kb_children) = kb_node.children_mut() else {
+        return Ok(());
+    };
+
+    if let Some(xkb) = &kb.xkb {
+        let xkb_children = child_of_doc(kb_children, "xkb").and_then(|n| n.children_mut().as_mut());
+        if let Some(xkb_children) = xkb_children {
+            if let Some(v) = &xkb.layout {
+                set_string_scalar(xkb_children, "layout", v)?;
+            }
+            if let Some(v) = &xkb.variant {
+                set_string_scalar(xkb_children, "variant", v)?;
+            }
+            if let Some(v) = &xkb.options {
+                set_string_scalar(xkb_children, "options", v)?;
+            }
+            if let Some(v) = &xkb.model {
+                set_string_scalar(xkb_children, "model", v)?;
+            }
+            if let Some(v) = &xkb.rules {
+                set_string_scalar(xkb_children, "rules", v)?;
+            }
+            if let Some(v) = &xkb.file {
+                set_string_scalar(xkb_children, "file", v)?;
+            }
+        }
+    }
+
+    if let Some(v) = &kb.track_layout {
+        set_string_scalar(kb_children, "track-layout", v)?;
+    }
+    if let Some(v) = kb.repeat_delay {
+        set_int_scalar(kb_children, "repeat-delay", v)?;
+    }
+    if let Some(v) = kb.repeat_rate {
+        set_int_scalar(kb_children, "repeat-rate", v)?;
+    }
+    set_class_c_flag(kb_children, "numlock", kb.numlock);
+    Ok(())
+}
+
+/// Shared device fields for touchpad, mouse, trackpoint.
+struct DeviceFields {
+    off: Option<bool>,
+    natural_scroll: Option<bool>,
+    accel_speed: Option<f32>,
+    accel_profile: Option<String>,
+    scroll_method: Option<String>,
+    scroll_button: Option<String>,
+    left_handed: Option<bool>,
+}
+
+/// Apply a device section (touchpad, mouse, trackpoint) with shared fields.
+fn apply_device_section(
+    children: &mut KdlDocument,
+    section_name: &str,
+    fields: &DeviceFields,
+) -> Result<(), ApplyError> {
+    let Some(dev_node) = child_of_doc(children, section_name) else {
+        return Ok(());
+    };
+    let Some(dev_children) = dev_node.children_mut() else {
+        return Ok(());
+    };
+
+    for (flag_name, flag_val) in [
+        ("off", fields.off),
+        ("natural-scroll", fields.natural_scroll),
+        ("left-handed", fields.left_handed),
+    ] {
+        match flag_val {
+            Some(true) => set_class_a_flag(dev_children, flag_name, true),
+            Some(false) => {
+                set_class_a_flag(dev_children, flag_name, false);
+            }
+            None => {}
+        }
+    }
+
+    if let Some(v) = fields.accel_speed {
+        set_float_scalar(dev_children, "accel-speed", v)?;
+    }
+    if let Some(v) = &fields.accel_profile {
+        set_string_scalar(dev_children, "accel-profile", v)?;
+    }
+    if let Some(v) = &fields.scroll_method {
+        set_string_scalar(dev_children, "scroll-method", v)?;
+    }
+    // scroll-button — integer per niri (schema has String, see R-4)
+    if let Some(v) = &fields.scroll_button {
+        if let Ok(n) = v.parse::<i32>() {
+            if let Some(node) = dev_children
+                .nodes_mut()
+                .iter_mut()
+                .find(|n| n.name().value() == "scroll-button")
+            {
+                set_single_arg(node, Value::from(n))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn apply_touchpad(children: &mut KdlDocument, tp: &TouchpadConfig) -> Result<(), ApplyError> {
+    apply_device_section(
+        children,
+        "touchpad",
+        &DeviceFields {
+            off: tp.off,
+            natural_scroll: tp.natural_scroll,
+            accel_speed: tp.accel_speed,
+            accel_profile: tp.accel_profile.clone(),
+            scroll_method: tp.scroll_method.clone(),
+            scroll_button: tp.scroll_button.clone(),
+            left_handed: tp.left_handed,
+        },
+    )?;
+
+    let Some(tp_node) = child_of_doc(children, "touchpad") else {
+        return Ok(());
+    };
+    let Some(tp_children) = tp_node.children_mut() else {
+        return Ok(());
+    };
+
+    for (flag_name, flag_val) in [("tap", tp.tap), ("dwt", tp.dwt), ("dwtp", tp.dwtp)] {
+        if let Some(val) = flag_val {
+            set_class_a_flag(tp_children, flag_name, val);
+        }
+    }
+
+    // drag — class D: drag true/drag false (argument required)
+    set_class_d_flag(tp_children, "drag", tp.drag)?;
+
+    // middle-emulation — class A
+    if let Some(val) = tp.middle_emulation {
+        set_class_a_flag(tp_children, "middle-emulation", val);
+    }
+    Ok(())
+}
+
+fn apply_mouse(children: &mut KdlDocument, m: &MouseConfig) -> Result<(), ApplyError> {
+    apply_device_section(
+        children,
+        "mouse",
+        &DeviceFields {
+            off: m.off,
+            natural_scroll: m.natural_scroll,
+            accel_speed: m.accel_speed,
+            accel_profile: m.accel_profile.clone(),
+            scroll_method: m.scroll_method.clone(),
+            scroll_button: m.scroll_button.clone(),
+            left_handed: m.left_handed,
+        },
+    )
+}
+
+fn apply_trackpoint(children: &mut KdlDocument, tp: &TrackpointConfig) -> Result<(), ApplyError> {
+    apply_device_section(
+        children,
+        "trackpoint",
+        &DeviceFields {
+            off: tp.off,
+            natural_scroll: tp.natural_scroll,
+            accel_speed: tp.accel_speed,
+            accel_profile: tp.accel_profile.clone(),
+            scroll_method: tp.scroll_method.clone(),
+            scroll_button: tp.scroll_button.clone(),
+            left_handed: tp.left_handed,
+        },
+    )
+}
+
+/// Tablet: only `off` (class A).
+fn apply_tablet(children: &mut KdlDocument, t: &TabletConfig) -> Result<(), ApplyError> {
+    let Some(t_node) = child_of_doc(children, "tablet") else {
+        return Ok(());
+    };
+    let Some(t_children) = t_node.children_mut() else {
+        return Ok(());
+    };
+    if let Some(val) = t.off {
+        set_class_a_flag(t_children, "off", val);
+    }
+    Ok(())
+}
+
+/// Touch: only `off` (class A).
+fn apply_touch(children: &mut KdlDocument, t: &TouchConfig) -> Result<(), ApplyError> {
+    let Some(t_node) = child_of_doc(children, "touch") else {
+        return Ok(());
+    };
+    let Some(t_children) = t_node.children_mut() else {
+        return Ok(());
+    };
+    if let Some(val) = t.off {
+        set_class_a_flag(t_children, "off", val);
+    }
+    Ok(())
+}
+
+/// focus-follows-mouse: Class B enabler. True = bare node, false = error.
+fn apply_focus_follows_mouse(children: &mut KdlDocument, value: bool) -> Result<(), ApplyError> {
+    set_enabler(children, "focus-follows-mouse", value)
+}
+
+/// warp-mouse-to-focus: Class B enabler. True = bare node, false = error.
+fn apply_warp_mouse_to_focus(children: &mut KdlDocument, value: bool) -> Result<(), ApplyError> {
+    set_enabler(children, "warp-mouse-to-focus", value)
+}
+
+/// mod-key: scalar string (must be quoted, lowercase enum values).
+fn apply_mod_key(children: &mut KdlDocument, value: &str) -> Result<(), ApplyError> {
+    set_string_scalar(children, "mod-key", value)
 }
 
 fn find_top<'a>(doc: &'a mut KdlDocument, name: &str) -> Option<&'a mut KdlNode> {
@@ -608,7 +1102,17 @@ fn set_single_arg(node: &mut KdlNode, value: Value) -> Result<(), ApplyError> {
 fn same_scalar(left: &KdlValue, right: &KdlValue) -> bool {
     match (number_of(left), number_of(right)) {
         (Some(a), Some(b)) => a == b,
-        _ => left == right,
+        _ => {
+            // Floats: the typed model stores f32, the AST stores f64. A value
+            // read out of the AST as f32 and converted back to f64 is not bit-
+            // identical, so compare with a tolerance that is tight enough to
+            // reject real edits but loose enough to accept the round-trip.
+            if let (KdlValue::Base10Float(a), KdlValue::Base10Float(b)) = (left, right) {
+                (a - b).abs() < 1e-6
+            } else {
+                left == right
+            }
+        }
     }
 }
 
@@ -1485,9 +1989,11 @@ fn child_f32(node: &KdlNode, name: &str) -> Option<f32> {
 
 /// A child node that stands for a boolean.
 ///
-/// niri writes `natural-scroll` for true and `/-natural-scroll` for false. A
-/// `/-` node is still a node in the AST, so an explicit `natural-scroll false`
-/// is a real setting and is read as false.
+/// niri writes a bare `natural-scroll` for true. To disable a class-A flag it
+/// omits the node — or spells it as `/-natural-scroll`, which the KDL parser
+/// treats as a *comment*, not a node. Either way there is no `natural-scroll`
+/// node in the AST, so a disabled flag reads back as `None` (absent), not
+/// `Some(false)`.
 fn flag_child(node: &KdlNode, name: &str) -> Option<bool> {
     let value = child_scalar(node, name)?;
     match value {
@@ -2139,4 +2645,235 @@ mod tests {
         );
         assert!(report.unmapped.is_empty(), "{:?}", report.unmapped);
     }
+
+    // --- E: input writeback ---------------------------------------------------
+
+    #[test]
+    fn input_section_is_a_byte_for_byte_noop_on_unchanged_config() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        let body = "input {\n    keyboard {\n        xkb {\n            layout \"us,ru\"\n        }\n        numlock\n    }\n\n    touchpad {\n        tap\n        natural-scroll\n        dwt\n        accel-speed 0.3\n    }\n\n    mouse {\n        natural-scroll\n    }\n}\n";
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let config = to_config(&set).expect("project");
+        let changed = apply_config(&mut set, &config).expect("apply");
+        assert_eq!(
+            set.main().doc.to_string(),
+            body,
+            "a no-edit save must not rewrite the input section"
+        );
+        assert!(changed.is_empty(), "a no-op should report no files changed");
+    }
+
+    #[test]
+    fn enabling_tap_writes_a_bare_node() {
+        let out = round_trip("input {\n    touchpad {\n    }\n}\n", |config| {
+            let input = config.input.as_mut().expect("input");
+            input.touchpad = Some(TouchpadConfig {
+                tap: Some(true),
+                ..TouchpadConfig::default()
+            });
+        });
+        assert_eq!(
+            out, "input {\n    touchpad {\n        tap\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn disabling_tap_comments_out_the_node() {
+        let out = round_trip(
+            "input {\n    touchpad {\n        tap\n    }\n}\n",
+            |config| {
+                let input = config.input.as_mut().expect("input");
+                input.touchpad = Some(TouchpadConfig {
+                    tap: Some(false),
+                    ..TouchpadConfig::default()
+                });
+            },
+        );
+        assert_eq!(
+            out, "input {\n    touchpad {\n        /-tap\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    /// A `/-tap` line is a KDL comment, not a node, so a disabled class-A flag
+    /// reads back as `None` (absent) rather than `Some(false)` — which is how
+    /// niri itself treats an omitted node.
+    #[test]
+    fn commented_out_tap_reads_as_absent() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        std::fs::write(&path, "input {\n    touchpad {\n        /-tap\n    }\n}\n").expect("write");
+
+        let set = load_config_set(&path).expect("load");
+        let config = to_config(&set).expect("project");
+        let input = config.input.as_ref().expect("input");
+        let touchpad = input.touchpad.as_ref().expect("touchpad");
+        assert_eq!(touchpad.tap, None, "a /- comment is not a node");
+    }
+
+    #[test]
+    fn numlock_write_true_strips_argument() {
+        let out = round_trip(
+            "input {\n    keyboard {\n        numlock false\n    }\n}\n",
+            |config| {
+                let input = config.input.as_mut().expect("input");
+                input.keyboard = Some(KeyboardConfig {
+                    numlock: Some(true),
+                    ..KeyboardConfig::default()
+                });
+            },
+        );
+        assert_eq!(
+            out, "input {\n    keyboard {\n        numlock\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn numlock_write_false_keeps_explicit_bool() {
+        let out = round_trip(
+            "input {\n    keyboard {\n        numlock\n    }\n}\n",
+            |config| {
+                let input = config.input.as_mut().expect("input");
+                input.keyboard = Some(KeyboardConfig {
+                    numlock: Some(false),
+                    ..KeyboardConfig::default()
+                });
+            },
+        );
+        assert_eq!(
+            out, "input {\n    keyboard {\n        numlock false\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn accel_speed_round_trips_without_precision_loss() {
+        let out = round_trip(
+            "input {\n    touchpad {\n        accel-speed 0.3\n    }\n}\n",
+            |config| {
+                let input = config.input.as_mut().expect("input");
+                input.touchpad = Some(TouchpadConfig {
+                    accel_speed: Some(0.4),
+                    ..TouchpadConfig::default()
+                });
+            },
+        );
+        assert_eq!(
+            out, "input {\n    touchpad {\n        accel-speed 0.4\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn xkb_layout_is_written_quoted() {
+        let out = round_trip(
+            "input {\n    keyboard {\n        xkb {\n        }\n    }\n}\n",
+            |config| {
+                let input = config.input.as_mut().expect("input");
+                input.keyboard = Some(KeyboardConfig {
+                    xkb: Some(XkbConfig {
+                        layout: Some("us,ru".to_string()),
+                        ..XkbConfig::default()
+                    }),
+                    ..KeyboardConfig::default()
+                });
+            },
+        );
+        assert_eq!(
+            out,
+            "input {\n    keyboard {\n        xkb {\n            layout \"us,ru\"\n        }\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn enabling_drag_writes_argument() {
+        let out = round_trip("input {\n    touchpad {\n    }\n}\n", |config| {
+            let input = config.input.as_mut().expect("input");
+            input.touchpad = Some(TouchpadConfig {
+                drag: Some(true),
+                ..TouchpadConfig::default()
+            });
+        });
+        assert_eq!(
+            out, "input {\n    touchpad {\n        drag true\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn enabling_focus_follows_mouse_is_bare() {
+        let out = round_trip("input {\n}\n", |config| {
+            let input = config.input.as_mut().expect("input");
+            input.focus_follows_mouse = Some(true);
+        });
+        assert_eq!(out, "input {\n    focus-follows-mouse\n}\n", "{out}");
+    }
+
+    #[test]
+    fn focus_follows_mouse_false_returns_error() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        let body = "input {\n    focus-follows-mouse\n}\n";
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let mut config = to_config(&set).expect("project");
+        config.input = Some(InputConfig {
+            focus_follows_mouse: Some(false),
+            ..config.input.unwrap_or_default()
+        });
+
+        let result = apply_config(&mut set, &config);
+        assert!(result.is_err(), "focus-follows-mouse false must error");
+    }
+
+    #[test]
+    fn mod_key_is_written_quoted() {
+        let out = round_trip("input {\n}\n", |config| {
+            let input = config.input.as_mut().expect("input");
+            input.mod_key = Some("Ctrl".to_string());
+        });
+        assert_eq!(out, "input {\n    mod-key \"Ctrl\"\n}\n", "{out}");
+    }
+
+    #[test]
+    fn repeat_delay_is_written_as_integer() {
+        let out = round_trip("input {\n    keyboard {\n    }\n}\n", |config| {
+            let input = config.input.as_mut().expect("input");
+            input.keyboard = Some(KeyboardConfig {
+                repeat_delay: Some(700),
+                repeat_rate: Some(50),
+                ..KeyboardConfig::default()
+            });
+        });
+        assert_eq!(
+            out,
+            "input {\n    keyboard {\n        repeat-delay 700\n        repeat-rate 50\n    }\n}\n",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn with_comments_input_no_op_preserves_formatting() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("config.kdl");
+        let body = "input {\n        keyboard {   // inconsistent indentation on purpose\n                xkb {\n                        layout \"us,ru\" // trailing comment\n                }\n                numlock\n        }\n\n    touchpad {\n        tap\n        natural-scroll\n        dwt\n\n        accel-speed 0.3\n    }\n\n        mouse {\n                // off\n                natural-scroll\n        }\n}\n";
+        std::fs::write(&path, body).expect("write");
+
+        let mut set = load_config_set(&path).expect("load");
+        let config = to_config(&set).expect("project");
+        apply_config(&mut set, &config).expect("apply");
+        assert_eq!(
+            set.main().doc.to_string(),
+            body,
+            "comments and formatting must survive a no-op round-trip"
+        );
+    }
 }
+// Фиксированный тестовый комментарий
