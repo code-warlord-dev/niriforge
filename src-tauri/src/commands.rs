@@ -163,7 +163,7 @@ pub fn contract_schema() -> schemars::schema::RootSchema {
 pub async fn load_config(path: Option<PathBuf>) -> AppResult<ConfigDto> {
     // Resolve config path with XDG priority
     let config_path = match path {
-        Some(p) => p,
+        Some(p) => crate::fs::paths::normalize_path(p)?,
         None => crate::fs::paths::get_niri_config_path()?,
     };
 

@@ -20,30 +20,31 @@ pub fn get_niri_config_path() -> AppResult<PathBuf> {
     // Priority 1: $XDG_CONFIG_HOME/niri/config.kdl (dirs::config_dir() handles XDG_CONFIG_HOME)
     if let Some(config_dir) = dirs::config_dir() {
         let path = config_dir.join("niri").join("config.kdl");
-        return Ok(normalize_path(path));
+        return Ok(normalize_path(path)?);
     }
 
     // Priority 2: $HOME/.config/niri/config.kdl
     if let Some(home) = dirs::home_dir() {
         let path = home.join(".config").join("niri").join("config.kdl");
-        return Ok(normalize_path(path));
+        return Ok(normalize_path(path)?);
     }
 
     // Priority 3: /etc/niri/config.kdl (system fallback)
     let path = PathBuf::from("/etc/niri/config.kdl");
-    Ok(normalize_path(path))
+    Ok(normalize_path(path)?)
 }
 
 /// Normalize a path by expanding tilde and resolving symlinks if the file exists.
 /// If the file doesn't exist, return the path with tilde expanded but without canonicalization.
-fn normalize_path(path: PathBuf) -> PathBuf {
+pub fn normalize_path(path: PathBuf) -> AppResult<PathBuf> {
     // Expand tilde if present
     let expanded = shellexpand::tilde(&path.to_string_lossy()).into_owned();
     let path = PathBuf::from(expanded);
 
     // Try to canonicalize (resolve symlinks) if the file exists
     // If it doesn't exist, return the expanded path as-is
-    std::fs::canonicalize(&path).unwrap_or(path)
+    let canonicalized = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+    Ok(canonicalized)
 }
 
 /// Get the NiriForge app data directory (~/.local/share/niriforge or $XDG_DATA_HOME/niriforge).
@@ -189,7 +190,7 @@ mod tests {
     fn normalize_path_expands_tilde() {
         // Use a path with tilde
         let path = PathBuf::from("~/test/path");
-        let normalized = normalize_path(path);
+        let normalized = normalize_path(path).expect("normalize_path should succeed");
 
         // Should not contain tilde
         let path_str = normalized.to_string_lossy();
