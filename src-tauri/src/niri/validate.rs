@@ -685,18 +685,17 @@ mod tests {
             "old\n",
             "validation must not replace the real file"
         );
-        let left: Vec<String> = std::fs::read_dir(dir.path())
+        let mut left: Vec<String> = std::fs::read_dir(dir.path())
             .expect("read_dir")
             .map(|e| e.expect("entry").file_name().display().to_string())
             .collect();
-        assert_eq!(
-            left,
-            vec![
-                "config.kdl".to_string(),
-                binary.file_name().expect("name").display().to_string()
-            ],
-            "the staged candidate must be gone"
-        );
+        left.sort();
+        let mut expected = vec![
+            "config.kdl".to_string(),
+            binary.file_name().expect("name").display().to_string(),
+        ];
+        expected.sort();
+        assert_eq!(left, expected, "the staged candidate must be gone");
     }
 
     #[tokio::test]
@@ -716,11 +715,12 @@ mod tests {
         .expect("the run should complete");
 
         assert!(!outcome.is_valid());
-        let left: Vec<String> = std::fs::read_dir(dir.path())
+        let mut left: Vec<String> = std::fs::read_dir(dir.path())
             .expect("read_dir")
             .map(|e| e.expect("entry").file_name().display().to_string())
             .filter(|n| !n.starts_with("niri-"))
             .collect();
+        left.sort();
         assert_eq!(left, vec!["config.kdl".to_string()]);
     }
 
