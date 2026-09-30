@@ -30,6 +30,7 @@ Not a fork of NiriMod. New codebase: typed config model, atomic saves, KDL round
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Roadmap |
 | [docs/VERSIONING.md](docs/VERSIONING.md) | Version policy |
 | [docs/SCHEMA-OVERVIEW.md](docs/SCHEMA-OVERVIEW.md) | Config section coverage |
+| [docs/CONTRACT.md](docs/CONTRACT.md) | Backend/frontend wire contract |
 | [docs/guides/](docs/guides/) | Development and safety notes |
 | [docs/design-reference/DESIGN-SYSTEM.md](docs/design-reference/DESIGN-SYSTEM.md) | UI tokens |
 

@@ -144,7 +144,13 @@ impl From<KdlError> for AppError {
     }
 }
 
-#[derive(Error, Debug, serde::Serialize)]
+/// What a command returns when it fails.
+///
+/// The `type` tag is the machine-readable half and the `details` the
+/// human-readable one. They are the same string space: the tag is the variant
+/// name, which is why the frontend can switch on it and get an exhaustive check,
+/// and why no separate `code` field exists to fall out of step with it.
+#[derive(Error, Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "type", content = "details")]
 pub enum AppError {
     #[error("IO error: {0}")]
@@ -222,7 +228,6 @@ impl From<IncludeError> for AppError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ValidationError {
     pub file: Option<String>,
     pub line: Option<usize>,

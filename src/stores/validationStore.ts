@@ -1,28 +1,16 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-
-export interface ValidationIssue {
-  id: string;
-  type: "error" | "warning";
-  message: string;
-  location?: {
-    file: string;
-    line: number;
-    column: number;
-  };
-  code?: string;
-  section?: string;
-}
+import { toIssues, type ValidationError, type ValidationIssue } from "@/types/config";
 
 interface ValidationState {
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
   isValidating: boolean;
 
-  setErrors: (errors: ValidationIssue[]) => void;
-  setWarnings: (warnings: ValidationIssue[]) => void;
-  addError: (error: ValidationIssue) => void;
-  addWarning: (warning: ValidationIssue) => void;
+  setErrors: (errors: ValidationError[]) => void;
+  setWarnings: (warnings: ValidationError[]) => void;
+  addError: (error: ValidationError) => void;
+  addWarning: (warning: ValidationError) => void;
   clear: () => void;
   startValidation: () => void;
   finishValidation: () => void;
@@ -35,17 +23,25 @@ export const useValidationStore = create<ValidationState>()(
     warnings: [],
     isValidating: false,
 
-    setErrors: (errors) => set({ errors }),
-    setWarnings: (warnings) => set({ warnings }),
-    addError: (error) => set((state) => { state.errors.push(error); }),
-    addWarning: (warning) => set((state) => { state.warnings.push(warning); }),
+    // The backend sends `ValidationError`s; the identity a row needs is ours to
+    // make, so it is made once here rather than guessed at in the panel.
+    setErrors: (errors) => set({ errors: toIssues(errors) }),
+    setWarnings: (warnings) => set({ warnings: toIssues(warnings) }),
+    addError: (error) =>
+      set((current) => {
+        current.errors.push(...toIssues([error]));
+      }),
+    addWarning: (warning) =>
+      set((current) => {
+        current.warnings.push(...toIssues([warning]));
+      }),
     clear: () => set({ errors: [], warnings: [] }),
     startValidation: () => set({ isValidating: true }),
     finishValidation: () => set({ isValidating: false }),
     dismissIssue: (id) =>
-      set((state) => {
-        state.errors = state.errors.filter((issue: ValidationIssue) => issue.id !== id);
-        state.warnings = state.warnings.filter((issue: ValidationIssue) => issue.id !== id);
+      set((current) => {
+        current.errors = current.errors.filter((issue) => issue.id !== id);
+        current.warnings = current.warnings.filter((issue) => issue.id !== id);
       }),
   }))
 );

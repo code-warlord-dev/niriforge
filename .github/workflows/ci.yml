@@ -102,6 +102,30 @@ jobs:
       - name: Test
         run: cargo test
 
+      # The frontend's types are generated from the types the backend serialises.
+      # Regenerating here and failing on a diff is what keeps the two in step: a
+      # field renamed in Rust without `pnpm gen:types` breaks the build instead
+      # of the running app, where it would read as a backend bug.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        working-directory: ./
+        run: pnpm install --frozen-lockfile
+
+      - name: Wire contract is generated from the Rust types
+        working-directory: ./
+        run: pnpm check:contract
+
   coverage:
     name: Backend Coverage (tarpaulin)
     runs-on: ubuntu-latest

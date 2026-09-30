@@ -29,6 +29,9 @@ pub struct Config {
     pub clipboard: Option<ClipboardConfig>,
     pub hotkey_overlay: Option<HotkeyOverlayConfig>,
     pub config_notification: Option<ConfigNotificationConfig>,
+    /// A `serde_json::Value` has no schema, so the frontend sees these as
+    /// `unknown` and has to narrow before it reads anything. That is the point:
+    /// the UI is told there is a node here it does not model, and not what it is.
     pub unknown: Vec<serde_json::Value>,
     pub includes: Vec<IncludeEntry>,
 }

@@ -1,6 +1,10 @@
 [package]
 name = "niriforge"
-version = "0.1.8"
+<<<<<<< HEAD
+version = "0.1.9"
+=======
+version = "0.1.9"
+>>>>>>> 8d96053 (feat(contract): generate the frontend types from the Rust ones)
 description = "GUI configurator for niri Wayland compositor"
 authors = ["code_warlord"]
 edition = "2021"

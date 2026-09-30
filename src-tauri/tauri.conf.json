@@ -1,7 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "niriforge",
-  "version": "0.1.8",
+<<<<<<< HEAD
+  "version": "0.1.9",
+=======
+  "version": "0.1.9",
+>>>>>>> 8d96053 (feat(contract): generate the frontend types from the Rust ones)
   "identifier": "com.codewarlord.niriforge",
   "build": {
     "beforeDevCommand": "pnpm dev",

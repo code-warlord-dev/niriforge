@@ -1,7 +1,11 @@
 {
   "name": "niriforge",
   "private": true,
-  "version": "0.1.8",
+<<<<<<< HEAD
+  "version": "0.1.9",
+=======
+  "version": "0.1.9",
+>>>>>>> 8d96053 (feat(contract): generate the frontend types from the Rust ones)
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +13,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
+    "gen:contract": "cd src-tauri && cargo run --quiet --example export_contract > schema/contract.schema.json.tmp && mv schema/contract.schema.json.tmp schema/contract.schema.json",
+    "gen:types": "pnpm gen:contract && json2ts -i src-tauri/schema/contract.schema.json -o src/types/generated/contract.ts --additionalProperties false --unreachableDefinitions",
+    "check:contract": "pnpm gen:types && git diff --exit-code -- src/types/generated src-tauri/schema"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -61,6 +68,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "json-schema-to-typescript": "^15.0.4",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",

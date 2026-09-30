@@ -1,6 +1,15 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { Config, ConfigMeta, SaveOptions, SaveResult, ValidationResult, AppError } from "@/types/config";
+import { invokeCommand, toAppError } from "@/lib/ipc";
+import type {
+  AppError,
+  Config,
+  ConfigDto,
+  ConfigMeta,
+  SaveOptions,
+  SaveResult,
+  ValidationResult,
+} from "@/types/config";
 
 interface ConfigState {
   config: Config | null;
@@ -14,7 +23,6 @@ interface ConfigState {
   load: (path?: string) => Promise<void>;
   save: (opts?: SaveOptions) => Promise<SaveResult>;
   validate: () => Promise<ValidationResult>;
-  setSection: <K extends keyof Config>(key: K, value: Config[K]) => void;
   update: (fn: (draft: Config) => void) => void;
   resetToOriginal: () => void;
   markDirty: () => void;
@@ -37,17 +45,16 @@ export const useConfigStore = create<ConfigState>()(
     load: async (path?: string) => {
       set({ loading: true, error: null });
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const result = await invoke<{ config: Config; meta: ConfigMeta }>("load_config", { path });
+        const result = await invokeCommand<ConfigDto>("load_config", { path });
         set({
           config: result.config,
-          original: JSON.parse(JSON.stringify(result.config)),
+          original: structuredClone<Config>(result.config),
           meta: result.meta,
           dirty: false,
           loading: false,
         });
       } catch (err) {
-        set({ error: err as AppError, loading: false });
+        set({ error: toAppError(err), loading: false });
         throw err;
       }
     },
@@ -55,37 +62,31 @@ export const useConfigStore = create<ConfigState>()(
     save: async (opts?: SaveOptions) => {
       set({ saving: true, error: null });
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const config = get().config;
-        if (!config) throw new Error("No config to save");
-        const result = await invoke<SaveResult>("save_config", { config, options: opts });
+        const { config, meta } = get();
+        if (!config || !meta) throw new Error("No config is loaded");
+        const result = await invokeCommand<SaveResult>("save_config", {
+          config: { config, meta },
+          options: opts ?? {},
+        });
         if (result.success) {
           set({
-            original: JSON.parse(JSON.stringify(config)),
+            original: structuredClone<Config>(config),
             dirty: false,
             saving: false,
           });
         }
         return result;
       } catch (err) {
-        set({ error: err as AppError, saving: false });
+        set({ error: toAppError(err), saving: false });
         throw err;
       }
     },
 
     validate: async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const config = get().config;
-      if (!config) throw new Error("No config to validate");
-      return invoke<ValidationResult>("validate_config", { config });
-    },
-
-    setSection: <K extends keyof Config>(key: K, value: Config[K]) => {
-      set((state) => {
-        if (state.config) {
-          (state.config as Record<K, Config[K]>)[key] = value;
-          state.dirty = true;
-        }
+      const { config, meta } = get();
+      if (!config || !meta) throw new Error("No config is loaded");
+      return invokeCommand<ValidationResult>("validate_config", {
+        config: { config, meta },
       });
     },
 
@@ -99,18 +100,17 @@ export const useConfigStore = create<ConfigState>()(
     },
 
     resetToOriginal: () => {
-      set((state) => {
-        if (state.original) {
-          state.config = JSON.parse(JSON.stringify(state.original));
-          state.dirty = false;
-        }
-      });
+      // Read outside the recipe: a value taken out of an immer draft is a
+      // proxy, and a proxy cannot be cloned.
+      const { original } = get();
+      if (!original) return;
+      set({ config: structuredClone<Config>(original), dirty: false });
     },
 
     markDirty: () => set({ dirty: true }),
     markClean: () => set({ dirty: false }),
-    setError: (error: AppError | null) => set({ error }),
-    setLoading: (loading: boolean) => set({ loading }),
-    setSaving: (saving: boolean) => set({ saving }),
+    setError: (error) => set({ error }),
+    setLoading: (loading) => set({ loading }),
+    setSaving: (saving) => set({ saving }),
   }))
 );

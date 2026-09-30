@@ -1,49 +1,157 @@
-use crate::error::{AppError, AppResult};
+//! The wire contract between the backend and the frontend.
+//!
+//! Every type a command takes or returns is declared here, and every one of them
+//! is reachable from [`Contract`], which is the root of the JSON Schema the
+//! TypeScript types are generated from. A type that is not named there cannot
+//! reach the frontend, which is the point: the frontend is written against a
+//! generated file, not against a hand-maintained copy of these structs.
+//!
+//! Two rules hold for every field on the wire, and both are checked by tests in
+//! `tests/contract.rs` rather than by convention:
+//!
+//! - Field names are `kebab-case`, the spelling niri itself uses in the config
+//!   file. `schema/mod.rs` has to say that anyway, because the KDL mapper reads
+//!   its field names from serde, so a field that arrived in the UI as
+//!   `window_rules` could not be matched back to the `window-rules` node it came
+//!   from.
+//! - A field is optional on the wire if and only if the Rust field is an
+//!   `Option` or carries a `serde` default. There is no second opinion.
+//!
+//! The document that states the same thing for people is `docs/CONTRACT.md`.
+
+use crate::error::{AppError, AppResult, ValidationError};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::command;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub struct ConfigDto {
     pub config: crate::schema::Config,
     pub meta: ConfigMeta,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// What the backend knows about the config it just read.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub struct ConfigMeta {
+    /// The file the load was resolved against.
     pub main_path: PathBuf,
+    /// Every file that took part, the main one included, in load order.
     pub included_files: Vec<PathBuf>,
+    /// The niri version the config was checked against, if niri answered.
     pub niri_version: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// What the caller wants from a save.
+///
+/// The defaults are the safe ones: a save takes a backup and refuses to write a
+/// config that does not validate, unless the caller says otherwise. An omitted
+/// field is a decision, so a caller that cares has to say so.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case", default)]
 pub struct SaveOptions {
+    /// Take a backup before replacing the files.
     pub create_backup: bool,
+    /// Label for that backup.
     pub backup_name: Option<String>,
+    /// Refuse to write when validation fails.
     pub validate: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Default for SaveOptions {
+    fn default() -> Self {
+        Self {
+            create_backup: true,
+            backup_name: None,
+            validate: true,
+        }
+    }
+}
+
+/// The outcome of a save that returned successfully.
+///
+/// A save that failed is an `Err`, not a `success: false`: there is no partial
+/// outcome to report, and a caller that ignores the error still sees that the
+/// file it asked for is not what is on disk.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub struct SaveResult {
     pub success: bool,
+    /// The backup that was taken, if one was.
     pub backup_id: Option<String>,
+    /// Every file the write touched, empty when the write was a no-op.
     pub modified_files: Vec<PathBuf>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub struct ValidationResult {
     pub valid: bool,
     pub errors: Vec<ValidationError>,
     pub warnings: Vec<ValidationError>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationError {
-    pub file: Option<String>,
-    pub line: Option<usize>,
-    pub column: Option<usize>,
-    pub message: String,
-    pub code: Option<String>,
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct BackupMeta {
+    pub id: String,
+    pub name: Option<String>,
+    pub timestamp: String,
+    pub files: Vec<PathBuf>,
+    pub niri_version: Option<String>,
+    pub comment: Option<String>,
+    pub hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct OutputInfo {
+    pub name: String,
+    pub make: String,
+    pub model: String,
+    pub serial: String,
+    pub modes: Vec<ModeInfo>,
+    pub current_mode: Option<String>,
+    pub scale: f32,
+    pub transform: String,
+    pub position: crate::schema::Position,
+    pub vrr: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct ModeInfo {
+    pub width: i32,
+    pub height: i32,
+    pub refresh_rate: f32,
+    pub preferred: bool,
+}
+
+/// The root of the wire contract.
+///
+/// It is not a payload of any command. It exists so that one schema names every
+/// type the frontend can see, which is what makes "generate the TypeScript from
+/// this" a complete statement rather than a partial one.
+#[derive(Debug, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct Contract {
+    pub config: crate::schema::Config,
+    pub config_dto: ConfigDto,
+    pub config_meta: ConfigMeta,
+    pub save_options: SaveOptions,
+    pub save_result: SaveResult,
+    pub validation_result: ValidationResult,
+    pub validation_error: ValidationError,
+    pub app_error: AppError,
+    pub backup_meta: BackupMeta,
+    pub output_info: OutputInfo,
+}
+
+/// The JSON Schema the frontend's types are generated from.
+pub fn contract_schema() -> schemars::schema::RootSchema {
+    schemars::schema_for!(Contract)
 }
 
 #[command]
@@ -74,9 +182,20 @@ pub async fn list_backups() -> AppResult<Vec<BackupMeta>> {
 }
 
 #[command]
-#[allow(unused_variables)]
-pub async fn restore_backup(id: String) -> AppResult<()> {
+pub async fn restore_backup(_id: String) -> AppResult<()> {
     // TODO: Implement backup restore
+    Err(AppError::other("Not implemented yet"))
+}
+
+#[command]
+pub async fn create_backup(_name: Option<String>, _comment: Option<String>) -> AppResult<BackupMeta> {
+    // TODO: Implement backup creation
+    Err(AppError::other("Not implemented yet"))
+}
+
+#[command]
+pub async fn delete_backup(_id: String) -> AppResult<()> {
+    // TODO: Implement backup deletion
     Err(AppError::other("Not implemented yet"))
 }
 
@@ -105,41 +224,57 @@ pub async fn get_outputs() -> AppResult<Vec<OutputInfo>> {
     Err(AppError::other("Not implemented yet"))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BackupMeta {
-    pub id: String,
-    pub name: Option<String>,
-    pub timestamp: String,
-    pub files: Vec<PathBuf>,
-    pub niri_version: Option<String>,
-    pub comment: Option<String>,
-    pub hash: String,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputInfo {
-    pub name: String,
-    pub make: String,
-    pub model: String,
-    pub serial: String,
-    pub modes: Vec<ModeInfo>,
-    pub current_mode: Option<String>,
-    pub scale: f32,
-    pub transform: String,
-    pub position: Position,
-    pub vrr: bool,
-}
+    #[test]
+    fn save_options_default_to_the_safe_answer() {
+        let options: SaveOptions = serde_json::from_str("{}").expect("an empty request is valid");
+        assert!(options.create_backup, "a save takes a backup unless told not to");
+        assert!(
+            options.validate,
+            "a save refuses invalid config unless told not to"
+        );
+        assert!(options.backup_name.is_none());
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModeInfo {
-    pub width: i32,
-    pub height: i32,
-    pub refresh_rate: f32,
-    pub preferred: bool,
-}
+    #[test]
+    fn save_options_read_the_wire_names() {
+        let options: SaveOptions = serde_json::from_str(
+            r#"{ "create-backup": false, "backup-name": "before 1.2", "validate": false }"#,
+        )
+        .expect("kebab-case is the wire spelling");
+        assert!(!options.create_backup);
+        assert_eq!(options.backup_name.as_deref(), Some("before 1.2"));
+        assert!(!options.validate);
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Position {
-    pub x: i32,
-    pub y: i32,
+    #[test]
+    fn config_fields_reach_the_wire_as_niri_spells_them() {
+        let json = serde_json::to_value(ConfigDto {
+            config: crate::schema::Config::default(),
+            meta: ConfigMeta {
+                main_path: PathBuf::from("/etc/niri/config.kdl"),
+                included_files: vec![],
+                niri_version: None,
+            },
+        })
+        .expect("the config serialises");
+        let config = &json["config"];
+        assert!(config.get("window-rules").is_some(), "{config}");
+        assert!(config.get("spawn-at-startup").is_some(), "{config}");
+        assert!(config.get("window_rules").is_none(), "{config}");
+        assert_eq!(json["meta"]["main-path"], "/etc/niri/config.kdl");
+    }
+
+    #[test]
+    fn an_error_carries_a_tag_and_something_to_read() {
+        let json = serde_json::to_value(AppError::ConfigNotFound {
+            path: PathBuf::from("/tmp/config.kdl"),
+        })
+        .expect("the error serialises");
+        assert_eq!(json["type"], "ConfigNotFound");
+        assert_eq!(json["details"]["path"], "/tmp/config.kdl");
+    }
 }
