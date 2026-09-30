@@ -36,6 +36,8 @@ pnpm-debug.log*
 # Testing
 coverage/
 .nyc_output/
+src-tauri/lcov.info
+src-tauri/tarpaulin-report.json
 
 # Environment
 .env
