@@ -2,6 +2,7 @@
 
 use crate::error::{AppError, AppResult};
 use dirs;
+use shellexpand;
 use std::path::PathBuf;
 
 /// Get the niri config directory (~/.config/niri or $XDG_CONFIG_HOME/niri).
@@ -11,9 +12,38 @@ pub fn get_niri_config_dir() -> AppResult<PathBuf> {
     Ok(config_home.join("niri"))
 }
 
-/// Get the main niri config file path.
+/// Get the main niri config file path with proper priority:
+/// 1. $XDG_CONFIG_HOME/niri/config.kdl (or ~/.config/niri/config.kdl)
+/// 2. $HOME/.config/niri/config.kdl (fallback)
+/// 3. /etc/niri/config.kdl (system fallback)
 pub fn get_niri_config_path() -> AppResult<PathBuf> {
-    Ok(get_niri_config_dir()?.join("config.kdl"))
+    // Priority 1: $XDG_CONFIG_HOME/niri/config.kdl (dirs::config_dir() handles XDG_CONFIG_HOME)
+    if let Some(config_dir) = dirs::config_dir() {
+        let path = config_dir.join("niri").join("config.kdl");
+        return Ok(normalize_path(path));
+    }
+
+    // Priority 2: $HOME/.config/niri/config.kdl
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(".config").join("niri").join("config.kdl");
+        return Ok(normalize_path(path));
+    }
+
+    // Priority 3: /etc/niri/config.kdl (system fallback)
+    let path = PathBuf::from("/etc/niri/config.kdl");
+    Ok(normalize_path(path))
+}
+
+/// Normalize a path by expanding tilde and resolving symlinks if the file exists.
+/// If the file doesn't exist, return the path with tilde expanded but without canonicalization.
+fn normalize_path(path: PathBuf) -> PathBuf {
+    // Expand tilde if present
+    let expanded = shellexpand::tilde(&path.to_string_lossy()).into_owned();
+    let path = PathBuf::from(expanded);
+
+    // Try to canonicalize (resolve symlinks) if the file exists
+    // If it doesn't exist, return the expanded path as-is
+    std::fs::canonicalize(&path).unwrap_or(path)
 }
 
 /// Get the NiriForge app data directory (~/.local/share/niriforge or $XDG_DATA_HOME/niriforge).
@@ -98,4 +128,81 @@ mod tests {
     // directory. A test that has to clean up after itself in someone's home is a
     // test that will eventually leave something behind; the manager is covered
     // through `BackupManager::with_dir` against a temp directory instead.
+
+    /// get_niri_config_path resolves to the user config directory with proper priority
+    #[test]
+    fn config_path_uses_user_config_directory() {
+        let path = get_niri_config_path().expect("config path is derivable");
+
+        // Path should end with config.kdl
+        assert_eq!(
+            path.file_name().and_then(|n| n.to_str()),
+            Some("config.kdl"),
+            "config path must end with config.kdl, got: {}",
+            path.display()
+        );
+
+        // Path should be absolute (tilde expanded)
+        assert!(
+            path.is_absolute(),
+            "config path must be absolute (tilde expanded), got: {}",
+            path.display()
+        );
+
+        // Path should contain "niri" directory
+        let path_str = path.to_string_lossy();
+        assert!(
+            path_str.contains("niri"),
+            "config path must contain 'niri' directory, got: {}",
+            path.display()
+        );
+
+        // Priority 1: Should be under config_dir (XDG_CONFIG_HOME or ~/.config)
+        if let Some(config_dir) = dirs::config_dir() {
+            let expected_prefix = config_dir.join("niri");
+            assert!(
+                path.starts_with(&expected_prefix),
+                "config path should be under XDG_CONFIG_HOME/niri (priority 1), got: {}",
+                path.display()
+            );
+        }
+        // If config_dir is not available, it falls back to home/.config/niri or /etc/niri
+        else if let Some(home) = dirs::home_dir() {
+            let expected_prefix = home.join(".config").join("niri");
+            assert!(
+                path.starts_with(&expected_prefix),
+                "config path should be under $HOME/.config/niri (priority 2), got: {}",
+                path.display()
+            );
+        } else {
+            // System fallback
+            assert!(
+                path.starts_with("/etc/niri"),
+                "config path should be under /etc/niri (priority 3), got: {}",
+                path.display()
+            );
+        }
+    }
+
+    /// normalize_path expands tilde and canonicalizes existing files
+    #[test]
+    fn normalize_path_expands_tilde() {
+        // Use a path with tilde
+        let path = PathBuf::from("~/test/path");
+        let normalized = normalize_path(path);
+
+        // Should not contain tilde
+        let path_str = normalized.to_string_lossy();
+        assert!(
+            !path_str.starts_with("~"),
+            "tilde should be expanded, got: {}",
+            normalized.display()
+        );
+        // Should be absolute
+        assert!(
+            normalized.is_absolute(),
+            "normalized path should be absolute, got: {}",
+            normalized.display()
+        );
+    }
 }

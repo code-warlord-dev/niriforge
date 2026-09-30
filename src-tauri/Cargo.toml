@@ -24,6 +24,7 @@ schemars = "0.8"
 notify = "6"
 tokio = { version = "1", features = ["full"] }
 dirs = "5"
+shellexpand = "3"
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 
