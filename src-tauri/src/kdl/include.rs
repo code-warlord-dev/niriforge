@@ -33,6 +33,7 @@ use crate::kdl::source_map::SourceMap;
 use crate::schema::IncludeEntry;
 use kdl::{KdlDocument, KdlNode};
 use std::path::{Path, PathBuf};
+use tracing::{debug, trace};
 
 /// How deep an include chain may go.
 ///
@@ -148,6 +149,7 @@ impl KdlConfigSet {
 /// first, its includes are resolved recursively, and each file is recorded in
 /// the source map against the text it was parsed from.
 pub fn load_config_set(main_path: &Path) -> AppResult<KdlConfigSet> {
+    trace!(target: "niriforge::kdl::include", "load_config_set: {}", main_path.display());
     let mut entry = read_file(main_path, false, 0)?;
     let canonical = canonical_or_keep(&entry.path);
     entry.path = canonical.clone();
@@ -169,10 +171,12 @@ pub fn load_config_set(main_path: &Path) -> AppResult<KdlConfigSet> {
     let mut stack = vec![canonical.clone()];
     resolve_file(&canonical, &entry, &mut set, &mut stack, 0)?;
 
+    debug!(target: "niriforge::kdl::include", "load_config_set complete: {} files", set.files.len());
     Ok(set)
 }
 
 fn read_file(path: &Path, from_include: bool, depth: usize) -> AppResult<ConfigFile> {
+    trace!(target: "niriforge::kdl::include", "read_file: {} (depth: {})", path.display(), depth);
     let source = std::fs::read_to_string(path).map_err(|err| match err.kind() {
         std::io::ErrorKind::NotFound => AppError::ConfigNotFound {
             path: path.to_path_buf(),
@@ -202,6 +206,7 @@ fn resolve_file(
     stack: &mut Vec<PathBuf>,
     depth: usize,
 ) -> AppResult<()> {
+    trace!(target: "niriforge::kdl::include", "resolve_file: {} (depth: {})", current.display(), depth);
     for entry in extract_includes(&file.doc)? {
         let directive = IncludeDirective {
             raw_path: entry.path.clone(),
@@ -220,6 +225,7 @@ fn resolve_file(
             Ok(path) => path,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 if directive.optional {
+                    debug!(target: "niriforge::kdl::include", "optional include not found: {}", resolved.display());
                     set.includes
                         .skipped
                         .push((current.to_path_buf(), directive.clone()));
@@ -252,6 +258,7 @@ fn resolve_file(
             .into());
         }
 
+        debug!(target: "niriforge::kdl::include", "include resolved: {} -> {}", current.display(), canonical.display());
         set.includes.edges.push(IncludeEdge {
             from: current.to_path_buf(),
             to: canonical.clone(),

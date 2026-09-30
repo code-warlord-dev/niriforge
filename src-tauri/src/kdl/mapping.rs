@@ -35,6 +35,7 @@ use kdl::{KdlDocument, KdlNode, KdlValue};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use tracing::{debug, trace};
 
 /// A KDL construct that could not be expressed in the typed schema.
 ///
@@ -445,6 +446,7 @@ pub fn to_config_with_report(set: &KdlConfigSet) -> Result<(Config, ConfigReport
 
 /// Project a config set into the typed model.
 pub fn to_config(set: &KdlConfigSet) -> Result<Config, SchemaError> {
+    trace!(target: "niriforge::kdl::mapping", "to_config called");
     to_config_with_report(set).map(|(config, _)| config)
 }
 
@@ -457,6 +459,7 @@ pub type ChangedFiles = Vec<PathBuf>;
 /// the atomic write have to be pointed at: a save that touched two of the ten
 /// files in a config must not rewrite the other eight.
 pub fn apply_config(set: &mut KdlConfigSet, config: &Config) -> Result<ChangedFiles, ApplyError> {
+    trace!(target: "niriforge::kdl::mapping", "apply_config called: {} files", set.files.len());
     let mut changed = Vec::new();
     for file in &mut set.files {
         let before = file.source.clone();
@@ -473,6 +476,7 @@ pub fn apply_config(set: &mut KdlConfigSet, config: &Config) -> Result<ChangedFi
             .store_document(file.path.clone(), file.doc.clone(), &file.source);
         changed.push(file.path.clone());
     }
+    debug!(target: "niriforge::kdl::mapping", "apply_config: {} files changed", changed.len());
     Ok(changed)
 }
 

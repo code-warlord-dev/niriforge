@@ -33,6 +33,7 @@ use crate::kdl::{apply_config, serialize_file};
 use crate::niri::validate::{SkipReason, ValidationOutcome};
 use crate::schema::Config;
 use std::path::{Path, PathBuf};
+use tracing::{debug, error, info, trace, warn};
 
 /// What a save did, in enough detail for the application to update itself.
 #[derive(Debug, Clone)]
@@ -101,11 +102,13 @@ pub async fn save_config(
     config: &Config,
     ctx: &SaveContext<'_>,
 ) -> AppResult<SaveReport> {
+    trace!(target: "niriforge::fs::save", "save_config called");
     let changed = apply_config(set, config)?;
     if changed.is_empty() {
         // Nothing was edited. Taking a backup here would fill the user's backup
         // list with copies of a file nobody changed, and the rotation would
         // push out the ones that record real edits.
+        debug!(target: "niriforge::fs::save", "no changes detected, skipping save");
         return Ok(SaveReport {
             backup: None,
             written: Vec::new(),
@@ -113,6 +116,7 @@ pub async fn save_config(
         });
     }
 
+    debug!(target: "niriforge::fs::save", "changed files: {}", changed.len());
     let set_files = set.paths();
     let candidates = stage_candidates(set, &changed)?;
     let staged = Candidates::new(candidates);
@@ -121,6 +125,7 @@ pub async fn save_config(
     if let ValidationOutcome::Invalid(errors) = &validation {
         // `staged` drops here, so nothing is left in the config directory and
         // nothing on disk was touched.
+        warn!(target: "niriforge::fs::save", "validation failed with {} errors", errors.len());
         return Err(AppError::niri_validate(errors.clone()));
     }
 
@@ -137,6 +142,7 @@ pub async fn save_config(
             // would be a no-op that still swaps the inode - which shows up as a
             // modification to the user, in their editor and to anything else
             // watching. Leave it alone.
+            trace!(target: "niriforge::fs::save", "skipping unchanged file: {}", candidate.target.display());
             continue;
         }
         if let Err(err) = atomic::commit_staged(&candidate.path, &candidate.target) {
@@ -145,6 +151,7 @@ pub async fn save_config(
             // a sequence of renames has no cross-file atomicity. Say so, and name
             // the backup that gets the user back to a consistent set, rather than
             // reporting a plain write failure that hides the mixed state.
+            error!(target: "niriforge::fs::save", "commit_staged failed for {}: {}", candidate.target.display(), err);
             return Err(AppError::AtomicWrite(format!(
                 "{}: {err}; {} file(s) were already replaced and the config set is \
                  now mixed - restore backup {} to get back to a consistent state",
@@ -154,6 +161,7 @@ pub async fn save_config(
             )));
         }
         written.push(candidate.target.clone());
+        debug!(target: "niriforge::fs::save", "committed: {}", candidate.target.display());
     }
 
     // The guard drops here and removes whatever is still staged: a candidate that
@@ -163,6 +171,7 @@ pub async fn save_config(
     // function that can leave a staged file in the user's config directory.
 
     update_read_model(set, &written)?;
+    info!(target: "niriforge::fs::save", "save completed: {} files written", written.len());
     Ok(SaveReport {
         backup,
         written,
@@ -189,6 +198,7 @@ pub async fn restore_backup(backups: &BackupManager, id: &str) -> AppResult<Back
 /// the user is about to get. Validating the staged main file is what makes the
 /// check cover the set as niri will read it.
 fn stage_candidates(set: &KdlConfigSet, changed: &[PathBuf]) -> AppResult<Vec<StagedCandidate>> {
+    trace!(target: "niriforge::fs::save", "stage_candidates called: {} changed files", changed.len());
     let main = set.main_path.clone();
     let mut targets: Vec<PathBuf> = changed.to_vec();
     if !targets.contains(&main) {
@@ -207,6 +217,7 @@ fn stage_candidates(set: &KdlConfigSet, changed: &[PathBuf]) -> AppResult<Vec<St
         // The candidate is written next to the target under the target's own
         // name, so niri sees the includes the real file would see.
         let staged_path = atomic::stage_candidate(&target, text.as_bytes())?;
+        debug!(target: "niriforge::fs::save", "staged candidate: {} (depth: {})", target.display(), depth);
         out.push(StagedCandidate {
             target,
             path: staged_path,
@@ -227,18 +238,22 @@ async fn validate_candidates(
     staged: &Candidates,
     ctx: &SaveContext<'_>,
 ) -> AppResult<ValidationOutcome> {
+    trace!(target: "niriforge::fs::save", "validate_candidates called");
     let Some(main) = staged.main() else {
+        warn!(target: "niriforge::fs::save", "no main candidate found for validation");
         return Ok(ValidationOutcome::Skipped(SkipReason::NotExecutable {
             binary: ctx.niri_binary.to_string(),
             details: "the config set has no entry point to validate".to_string(),
         }));
     };
     if !ctx.validate {
+        info!(target: "niriforge::fs::save", "validation skipped (ctx.validate=false)");
         return Ok(ValidationOutcome::Skipped(SkipReason::NotExecutable {
             binary: ctx.niri_binary.to_string(),
             details: "validation was turned off for this save".to_string(),
         }));
     }
+    debug!(target: "niriforge::fs::save", "validating with niri: {}", main.target.display());
     crate::niri::validate::validate_candidate_with(ctx.niri_binary, &main.path, &main.target).await
 }
 
@@ -247,6 +262,7 @@ async fn take_backup(
     ctx: &SaveContext<'_>,
     set_files: &[PathBuf],
 ) -> AppResult<Option<BackupMeta>> {
+    trace!(target: "niriforge::fs::save", "take_backup called: {} files", set_files.len());
     let version = crate::niri::validate::niri_version(ctx.niri_binary).await;
     // The comment is what a reader of the backup list will see, so it is carried
     // through rather than accepted and dropped.
@@ -254,6 +270,7 @@ async fn take_backup(
         .backups
         .create_auto_backup_with(set_files, version, ctx.comment.clone())
         .await?;
+    debug!(target: "niriforge::fs::save", "backup created: {}", meta.id);
     Ok(Some(meta))
 }
 
@@ -264,6 +281,7 @@ async fn take_backup(
 /// afterwards describe a file the user no longer has. The document is already
 /// correct - `apply_config` mutated it - so only the text needs replacing.
 fn update_read_model(set: &mut KdlConfigSet, written: &[PathBuf]) -> AppResult<()> {
+    trace!(target: "niriforge::fs::save", "update_read_model called: {} files", written.len());
     for path in written {
         let on_disk = std::fs::read_to_string(path)
             .map_err(|err| AppError::Io(format!("{}: {err}", path.display())))?;
@@ -281,6 +299,7 @@ fn update_read_model(set: &mut KdlConfigSet, written: &[PathBuf]) -> AppResult<(
             &on_disk,
         );
     }
+    debug!(target: "niriforge::fs::save", "read model updated");
     Ok(())
 }
 

@@ -4,12 +4,16 @@ use crate::error::{AppError, AppResult};
 use dirs;
 use shellexpand;
 use std::path::PathBuf;
+use tracing::{debug, trace};
 
 /// Get the niri config directory (~/.config/niri or $XDG_CONFIG_HOME/niri).
 pub fn get_niri_config_dir() -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::paths", "get_niri_config_dir called");
     let config_home = dirs::config_dir()
         .ok_or_else(|| AppError::other("Could not determine config directory"))?;
-    Ok(config_home.join("niri"))
+    let path = config_home.join("niri");
+    debug!(target: "niriforge::fs::paths", "niri config dir: {}", path.display());
+    Ok(path)
 }
 
 /// Get the main niri config file path with proper priority:
@@ -17,26 +21,34 @@ pub fn get_niri_config_dir() -> AppResult<PathBuf> {
 /// 2. $HOME/.config/niri/config.kdl (fallback)
 /// 3. /etc/niri/config.kdl (system fallback)
 pub fn get_niri_config_path() -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::paths", "get_niri_config_path called");
     // Priority 1: $XDG_CONFIG_HOME/niri/config.kdl (dirs::config_dir() handles XDG_CONFIG_HOME)
     if let Some(config_dir) = dirs::config_dir() {
         let path = config_dir.join("niri").join("config.kdl");
-        return Ok(normalize_path(path)?);
+        let normalized = normalize_path(path)?;
+        debug!(target: "niriforge::fs::paths", "config path (priority 1): {}", normalized.display());
+        return Ok(normalized);
     }
 
     // Priority 2: $HOME/.config/niri/config.kdl
     if let Some(home) = dirs::home_dir() {
         let path = home.join(".config").join("niri").join("config.kdl");
-        return Ok(normalize_path(path)?);
+        let normalized = normalize_path(path)?;
+        debug!(target: "niriforge::fs::paths", "config path (priority 2): {}", normalized.display());
+        return Ok(normalized);
     }
 
     // Priority 3: /etc/niri/config.kdl (system fallback)
     let path = PathBuf::from("/etc/niri/config.kdl");
-    Ok(normalize_path(path)?)
+    let normalized = normalize_path(path)?;
+    debug!(target: "niriforge::fs::paths", "config path (priority 3): {}", normalized.display());
+    Ok(normalized)
 }
 
 /// Normalize a path by expanding tilde and resolving symlinks if the file exists.
 /// If the file doesn't exist, return the path with tilde expanded but without canonicalization.
 pub fn normalize_path(path: PathBuf) -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::paths", "normalize_path called with: {}", path.display());
     // Expand tilde if present
     let expanded = shellexpand::tilde(&path.to_string_lossy()).into_owned();
     let path = PathBuf::from(expanded);
@@ -44,36 +56,59 @@ pub fn normalize_path(path: PathBuf) -> AppResult<PathBuf> {
     // Try to canonicalize (resolve symlinks) if the file exists
     // If it doesn't exist, return the expanded path as-is
     let canonicalized = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+    debug!(target: "niriforge::fs::paths", "normalized path: {}", canonicalized.display());
     Ok(canonicalized)
 }
 
 /// Get the NiriForge app data directory (~/.local/share/niriforge or $XDG_DATA_HOME/niriforge).
 pub fn get_app_data_dir() -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::paths", "get_app_data_dir called");
     let data_home =
         dirs::data_dir().ok_or_else(|| AppError::other("Could not determine data directory"))?;
-    Ok(data_home.join("niriforge"))
+    let path = data_home.join("niriforge");
+    debug!(target: "niriforge::fs::paths", "app data dir: {}", path.display());
+    Ok(path)
 }
 
 /// Get the NiriForge backup directory.
 pub fn get_backup_dir() -> AppResult<PathBuf> {
-    Ok(get_app_data_dir()?.join("backups"))
+    trace!(target: "niriforge::fs::paths", "get_backup_dir called");
+    let path = get_app_data_dir()?.join("backups");
+    debug!(target: "niriforge::fs::paths", "backup dir: {}", path.display());
+    Ok(path)
 }
 
 /// Get the NiriForge settings file path.
 pub fn get_settings_path() -> AppResult<PathBuf> {
-    Ok(get_app_data_dir()?.join("settings.json"))
+    trace!(target: "niriforge::fs::paths", "get_settings_path called");
+    let path = get_app_data_dir()?.join("settings.json");
+    debug!(target: "niriforge::fs::paths", "settings path: {}", path.display());
+    Ok(path)
 }
 
 /// Get the NiriForge profiles directory.
 pub fn get_profiles_dir() -> AppResult<PathBuf> {
-    Ok(get_app_data_dir()?.join("profiles"))
+    trace!(target: "niriforge::fs::paths", "get_profiles_dir called");
+    let path = get_app_data_dir()?.join("profiles");
+    debug!(target: "niriforge::fs::paths", "profiles dir: {}", path.display());
+    Ok(path)
 }
 
 /// Ensure all NiriForge directories exist.
 pub fn ensure_app_dirs() -> AppResult<()> {
-    std::fs::create_dir_all(get_app_data_dir()?)?;
-    std::fs::create_dir_all(get_backup_dir()?)?;
-    std::fs::create_dir_all(get_profiles_dir()?)?;
+    trace!(target: "niriforge::fs::paths", "ensure_app_dirs called");
+    let data_dir = get_app_data_dir()?;
+    std::fs::create_dir_all(&data_dir)?;
+    debug!(target: "niriforge::fs::paths", "ensured app data dir: {}", data_dir.display());
+
+    let backup_dir = get_backup_dir()?;
+    std::fs::create_dir_all(&backup_dir)?;
+    debug!(target: "niriforge::fs::paths", "ensured backup dir: {}", backup_dir.display());
+
+    let profiles_dir = get_profiles_dir()?;
+    std::fs::create_dir_all(&profiles_dir)?;
+    debug!(target: "niriforge::fs::paths", "ensured profiles dir: {}", profiles_dir.display());
+
     Ok(())
 }
 

@@ -39,6 +39,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use tracing::{debug, info, trace, warn};
 
 /// Subdirectory of a backup holding the copies.
 const FILES_DIR: &str = "files";
@@ -105,13 +106,16 @@ impl BackupManager {
     /// worse than no manager: it would let a save proceed knowing there is no
     /// backup behind it.
     pub fn new() -> AppResult<Self> {
+        trace!(target: "niriforge::fs::backup", "BackupManager::new called");
         let backup_dir = crate::fs::paths::get_backup_dir()?;
+        debug!(target: "niriforge::fs::backup", "backup dir: {}", backup_dir.display());
         Self::with_dir(backup_dir)
     }
 
     /// A manager rooted at an explicit directory, for tests and for a future
     /// "keep backups next to the config" setting.
     pub fn with_dir(backup_dir: PathBuf) -> AppResult<Self> {
+        trace!(target: "niriforge::fs::backup", "BackupManager::with_dir called: {}", backup_dir.display());
         crate::fs::ensure_dir(&backup_dir)?;
         Ok(Self {
             backup_dir,
@@ -132,6 +136,7 @@ impl BackupManager {
 
     /// Change how many automatic backups are kept and rotate down to it now.
     pub async fn set_max_auto_backups(&mut self, keep: usize) -> AppResult<()> {
+        info!(target: "niriforge::fs::backup", "set_max_auto_backups: {}", keep);
         self.max_auto_backups = keep;
         self.rotate_auto_backups().await
     }
@@ -146,6 +151,7 @@ impl BackupManager {
         files: &[PathBuf],
         niri_version: Option<String>,
     ) -> AppResult<BackupMeta> {
+        trace!(target: "niriforge::fs::backup", "create_auto_backup called with {} files", files.len());
         self.create_auto_backup_with(files, niri_version, None)
             .await
     }
@@ -160,6 +166,7 @@ impl BackupManager {
         niri_version: Option<String>,
         comment: Option<String>,
     ) -> AppResult<BackupMeta> {
+        debug!(target: "niriforge::fs::backup", "create_auto_backup_with called: {} files, comment: {:?}", files.len(), comment);
         self.create(files, None, comment, niri_version, true).await
     }
 
@@ -171,6 +178,7 @@ impl BackupManager {
         comment: Option<String>,
         niri_version: Option<String>,
     ) -> AppResult<BackupMeta> {
+        info!(target: "niriforge::fs::backup", "create_named_backup called: name={}, {} files", name, files.len());
         if name.trim().is_empty() {
             return Err(AppError::backup("a named backup needs a name"));
         }
@@ -180,12 +188,14 @@ impl BackupManager {
 
     /// List all backups, newest first.
     pub async fn list_backups(&self) -> AppResult<Vec<BackupMeta>> {
+        trace!(target: "niriforge::fs::backup", "list_backups called");
         let mut out = Vec::new();
         collect_auto_backups(&self.backup_dir, &mut out)?;
         collect_named_backups(&self.backup_dir.join(NAMED_DIR), &mut out)?;
         // The id carries a monotonic counter, so the tie-break is only reached
         // for backups from different processes at the same instant.
         out.sort_by(|a, b| a.id.cmp(&b.id));
+        debug!(target: "niriforge::fs::backup", "listed {} backups", out.len());
         Ok(out)
     }
 
@@ -199,6 +209,7 @@ impl BackupManager {
     ///
     /// The current state is backed up first, so a restore is itself reversible.
     pub async fn restore_backup(&self, id: &str) -> AppResult<BackupMeta> {
+        info!(target: "niriforge::fs::backup", "restore_backup called with id: {}", id);
         let meta = self.read_meta(id)?;
         let dir = meta.dir.clone();
 
@@ -229,11 +240,13 @@ impl BackupManager {
         for (path, content) in sources {
             crate::fs::atomic::write_atomic_bytes(&path, &content).await?;
         }
+        info!(target: "niriforge::fs::backup", "restore_backup completed for id: {}", id);
         Ok(meta)
     }
 
     /// Delete a backup by ID.
     pub async fn delete_backup(&self, id: &str) -> AppResult<()> {
+        info!(target: "niriforge::fs::backup", "delete_backup called with id: {}", id);
         let meta = self.read_meta(id)?;
         std::fs::remove_dir_all(&meta.dir)
             .map_err(|err| AppError::backup(format!("{}: {err}", meta.dir.display())))
@@ -244,6 +257,7 @@ impl BackupManager {
     /// A backup on a failing disk is worse than no backup, because it looks like
     /// a way out. This is how the UI can tell the two apart.
     pub async fn verify(&self, id: &str) -> AppResult<bool> {
+        trace!(target: "niriforge::fs::backup", "verify called with id: {}", id);
         let meta = self.read_meta(id)?;
         Ok(compute_hash(&meta)? == meta.hash)
     }
@@ -254,6 +268,7 @@ impl BackupManager {
     /// a misconfiguration, and deleting the backup that was just taken because of
     /// it would defeat the point of taking it.
     pub async fn rotate_auto_backups(&self) -> AppResult<()> {
+        info!(target: "niriforge::fs::backup", "rotate_auto_backups called, max_auto_backups: {}", self.max_auto_backups);
         let mut out = Vec::new();
         collect_auto_backups(&self.backup_dir, &mut out)?;
         // Ids sort oldest-first, so the newest are at the end. The limit is
@@ -263,6 +278,7 @@ impl BackupManager {
         let keep = self.max_auto_backups.max(1);
         let drop_from = out.len().saturating_sub(keep);
         for stale in out.into_iter().take(drop_from) {
+            warn!(target: "niriforge::fs::backup", "rotating out backup: {}", stale.id);
             std::fs::remove_dir_all(&stale.dir)
                 .map_err(|err| AppError::backup(format!("{}: {err}", stale.dir.display())))?;
         }
@@ -274,6 +290,7 @@ impl BackupManager {
     /// Only reachable on request. A named backup is not garbage collection
     /// material, so the automatic rotation never touches `named/`.
     pub async fn rotate_named_backups(&self) -> AppResult<()> {
+        info!(target: "niriforge::fs::backup", "rotate_named_backups called, max_named_backups: {}", self.max_named_backups);
         let mut out = Vec::new();
         collect_named_backups(&self.backup_dir.join(NAMED_DIR), &mut out)?;
         let mut by_name: BTreeMap<String, Vec<BackupMeta>> = BTreeMap::new();
@@ -312,6 +329,7 @@ impl BackupManager {
         niri_version: Option<String>,
         is_auto: bool,
     ) -> AppResult<BackupMeta> {
+        trace!(target: "niriforge::fs::backup", "create called: {} files, is_auto: {}", files.len(), is_auto);
         if files.is_empty() {
             return Err(AppError::backup(
                 "nothing to back up: the file list is empty",
@@ -388,6 +406,7 @@ impl BackupManager {
         // disk and before the metadata that claims them is written.
         meta.hash = compute_hash(&meta)?;
         write_meta(&meta).await?;
+        debug!(target: "niriforge::fs::backup", "backup created: {}", meta.id);
         Ok(meta)
     }
 

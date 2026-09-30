@@ -4,10 +4,12 @@ pub mod commands;
 pub mod error;
 pub mod fs;
 pub mod kdl;
+pub mod logging;
 pub mod niri;
 pub mod schema;
 
 use crate::commands::*;
+use crate::logging::init_logging;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -16,6 +18,8 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    init_logging();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![

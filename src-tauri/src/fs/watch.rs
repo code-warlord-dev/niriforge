@@ -25,6 +25,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use tokio::sync::broadcast;
+use tracing::{debug, info, trace};
 
 /// How many events may pile up before a slow subscriber starts losing them.
 const EVENT_BUFFER: usize = 64;
@@ -91,6 +92,7 @@ pub struct ConfigWatcher {
 impl ConfigWatcher {
     /// Watch a config file and every file it includes.
     pub fn start(main_path: &Path, includes: &[PathBuf]) -> AppResult<Self> {
+        info!(target: "niriforge::fs::watch", "ConfigWatcher::start: main={}, includes={}", main_path.display(), includes.len());
         let main = crate::fs::resolve_symlinks(main_path)?;
         let mut watched: HashSet<PathBuf> = HashSet::new();
         watched.insert(main.clone());
@@ -104,6 +106,7 @@ impl ConfigWatcher {
             main_set = false;
         }
         let _ = main_set;
+        debug!(target: "niriforge::fs::watch", "watching {} files", watched.len());
 
         let (tx, rx) = broadcast::channel(EVENT_BUFFER);
         let watched_for_thread = watched.clone();
@@ -132,6 +135,7 @@ impl ConfigWatcher {
                 return Err(AppError::FileWatch(format!("{}: {err}", dir.display())));
             }
         }
+        debug!(target: "niriforge::fs::watch", "watching {} directories", dirs.len());
 
         let tx_for_thread = tx.clone();
         std::thread::Builder::new()
@@ -163,6 +167,7 @@ impl ConfigWatcher {
 
     /// Watch a single config file, with no includes.
     pub async fn watch_config(path: &Path) -> AppResult<Self> {
+        info!(target: "niriforge::fs::watch", "watch_config: {}", path.display());
         Self::start(path, &[])
     }
 
@@ -227,12 +232,14 @@ impl ConfigWatcher {
     /// A config that gains an include while the app is open has to be watched
     /// too, or an edit to it is invisible.
     pub fn watch_file(&mut self, path: &Path) -> AppResult<()> {
+        trace!(target: "niriforge::fs::watch", "watch_file: {}", path.display());
         let resolved = crate::fs::resolve_symlinks(path)?;
         if self.watched.insert(resolved.clone()) {
             if let Some(parent) = resolved.parent() {
                 self._watcher
                     .watch(parent, RecursiveMode::NonRecursive)
                     .map_err(AppError::from)?;
+                debug!(target: "niriforge::fs::watch", "now watching: {} (dir: {})", resolved.display(), parent.display());
             }
         }
         Ok(())
@@ -310,6 +317,7 @@ fn dispatch(
             is_main: canonical == main_path,
             kind,
         };
+        trace!(target: "niriforge::fs::watch", "dispatch: {} (main: {})", notice.path.display(), notice.is_main);
         let event = if kind == ChangeKind::Removed {
             ConfigEvent::Removed(notice)
         } else {

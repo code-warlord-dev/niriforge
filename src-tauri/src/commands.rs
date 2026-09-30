@@ -20,14 +20,11 @@
 //! The document that states the same thing for people is `docs/CONTRACT.md`.
 
 use crate::error::{AppError, AppResult, ValidationError};
-use tracing;
-use crate::fs::paths;
-use crate::kdl;
-use crate::niri::ipc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::command;
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -168,7 +165,8 @@ pub async fn load_config(path: Option<PathBuf>) -> AppResult<ConfigDto> {
     };
 
     // Log what we're loading
-    tracing::info!("Loading niri config from: {}", config_path.display());
+    info!(target: "niriforge::commands", "Loading niri config from: {}", config_path.display());
+    debug!(target: "niriforge::commands", "Resolved config path: {}", config_path.display());
 
     // Parse config with KDL engine (includes include resolution)
     let kdl_config = crate::kdl::parse_config(&config_path)?;
@@ -177,7 +175,7 @@ pub async fn load_config(path: Option<PathBuf>) -> AppResult<ConfigDto> {
     let config = crate::kdl::to_config(&kdl_config)?;
 
     // Log what we loaded
-    tracing::info!("Loaded config: {} outputs, {} binds, {} rules",
+    info!(target: "niriforge::commands", "Loaded config: {} outputs, {} binds, {} rules",
         config.outputs.len(),
         config.binds.binds.len(),
         config.window_rules.len() + config.layer_rules.len());
@@ -198,6 +196,7 @@ pub async fn load_config(path: Option<PathBuf>) -> AppResult<ConfigDto> {
 #[command]
 #[allow(unused_variables)]
 pub async fn save_config(config: ConfigDto, options: SaveOptions) -> AppResult<SaveResult> {
+    info!(target: "niriforge::commands", "save_config called with create_backup={}, validate={}", options.create_backup, options.validate);
     // TODO: Implement config saving with atomic write
     Err(AppError::other("Not implemented yet"))
 }
@@ -205,51 +204,56 @@ pub async fn save_config(config: ConfigDto, options: SaveOptions) -> AppResult<S
 #[command]
 #[allow(unused_variables)]
 pub async fn validate_config(config: ConfigDto) -> AppResult<ValidationResult> {
+    info!(target: "niriforge::commands", "validate_config called");
     // TODO: Implement validation
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
 pub async fn list_backups() -> AppResult<Vec<BackupMeta>> {
+    info!(target: "niriforge::commands", "list_backups called");
     // TODO: Implement backup listing
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
-pub async fn restore_backup(_id: String) -> AppResult<()> {
+pub async fn restore_backup(id: String) -> AppResult<()> {
+    info!(target: "niriforge::commands", "restore_backup called with id: {}", id);
     // TODO: Implement backup restore
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
 pub async fn serialize_file() -> AppResult<String> {
+    info!(target: "niriforge::commands", "serialize_file called");
     // TODO: Implement serialization of the full config
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
-pub async fn create_backup(
-    _name: Option<String>,
-    _comment: Option<String>,
-) -> AppResult<BackupMeta> {
+pub async fn create_backup(name: Option<String>, comment: Option<String>) -> AppResult<BackupMeta> {
+    info!(target: "niriforge::commands", "create_backup called with name: {:?}, comment: {:?}", name, comment);
     // TODO: Implement backup creation
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
-pub async fn delete_backup(_id: String) -> AppResult<()> {
+pub async fn delete_backup(id: String) -> AppResult<()> {
+    info!(target: "niriforge::commands", "delete_backup called with id: {}", id);
     // TODO: Implement backup deletion
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
 pub async fn get_config_path() -> AppResult<PathBuf> {
+    info!(target: "niriforge::commands", "get_config_path called");
     // TODO: Implement config path resolution
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
 pub async fn check_niri_running() -> AppResult<bool> {
+    info!(target: "niriforge::commands", "check_niri_running called");
     // TODO: Check if niri is running
     Err(AppError::other("Not implemented yet"))
 }
@@ -257,12 +261,14 @@ pub async fn check_niri_running() -> AppResult<bool> {
 #[command]
 #[allow(unused_variables)]
 pub async fn niri_msg(args: Vec<String>) -> AppResult<String> {
+    info!(target: "niriforge::commands", "niri_msg called with args: {:?}", args);
     // TODO: Execute niri msg
     Err(AppError::other("Not implemented yet"))
 }
 
 #[command]
 pub async fn get_outputs() -> AppResult<Vec<OutputInfo>> {
+    info!(target: "niriforge::commands", "get_outputs called");
     // TODO: Get live outputs from niri
     Err(AppError::other("Not implemented yet"))
 }

@@ -5,6 +5,7 @@ use crate::niri::types::{LayerInfo, OutputInfo, WindowInfo, WorkspaceInfo};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::process::Command;
+use tracing::{debug, trace, warn};
 
 /// How long a `niri msg` query may take before it is treated as failed.
 ///
@@ -18,6 +19,7 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(2);
 /// This asks the compositor, not the binary: an installed `niri` with no running
 /// session is the case that matters, and only the compositor knows.
 pub async fn is_niri_running() -> bool {
+    trace!(target: "niriforge::niri::ipc", "is_niri_running called");
     niri_msg(&["msg", "--json", "outputs"]).await.is_ok()
 }
 
@@ -26,6 +28,7 @@ pub async fn is_niri_running() -> bool {
 /// The arguments are passed as a list, never through a shell, so a value coming
 /// from a config or from the UI cannot turn into a command.
 pub async fn niri_msg(args: &[&str]) -> AppResult<String> {
+    trace!(target: "niriforge::niri::ipc", "niri_msg called with args: {:?}", args);
     niri_msg_with(crate::niri::validate::NIRI_BINARY, args).await
 }
 
@@ -35,6 +38,7 @@ pub async fn niri_msg(args: &[&str]) -> AppResult<String> {
 /// depending on the machine they run on. The arguments are still a list, so
 /// naming the binary is the only thing a caller controls.
 async fn niri_msg_with(binary: &str, args: &[&str]) -> AppResult<String> {
+    trace!(target: "niriforge::niri::ipc", "niri_msg_with: {} {:?}", binary, args);
     let output = with_timeout(
         Command::new(binary)
             .args(args)
@@ -49,6 +53,7 @@ async fn niri_msg_with(binary: &str, args: &[&str]) -> AppResult<String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        warn!(target: "niriforge::niri::ipc", "niri msg failed: {} exited with {}: {}", binary, output.status, stderr.trim());
         return Err(AppError::Other(format!(
             "{binary} exited with {}: {}",
             output.status,
@@ -91,13 +96,20 @@ async fn with_timeout<F>(future: F) -> std::result::Result<std::process::Output,
 where
     F: std::future::Future<Output = std::io::Result<std::process::Output>>,
 {
+    trace!(target: "niriforge::niri::ipc", "with_timeout started");
     match tokio::time::timeout(QUERY_TIMEOUT, future).await {
         Ok(Ok(output)) => Ok(output),
-        Ok(Err(err)) => Err(err.to_string()),
-        Err(_) => Err(format!(
-            "no answer within {} seconds",
-            QUERY_TIMEOUT.as_secs()
-        )),
+        Ok(Err(err)) => {
+            warn!(target: "niriforge::niri::ipc", "with_timeout: process error: {}", err);
+            Err(err.to_string())
+        }
+        Err(_) => {
+            warn!(target: "niriforge::niri::ipc", "with_timeout: timeout after {} seconds", QUERY_TIMEOUT.as_secs());
+            Err(format!(
+                "no answer within {} seconds",
+                QUERY_TIMEOUT.as_secs()
+            ))
+        }
     }
 }
 
@@ -106,7 +118,9 @@ async fn execute_niri_msg_json<T>(args: &[&str]) -> AppResult<T>
 where
     T: for<'de> serde::Deserialize<'de>,
 {
+    trace!(target: "niriforge::niri::ipc", "execute_niri_msg_json: {:?}", args);
     let stdout = niri_msg(args).await?;
+    debug!(target: "niriforge::niri::ipc", "niri msg response received ({} bytes)", stdout.len());
     serde_json::from_str(&stdout).map_err(|err| {
         AppError::Serialization(format!("niri returned something unreadable: {err}"))
     })
