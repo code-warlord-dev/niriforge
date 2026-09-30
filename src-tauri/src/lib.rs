@@ -31,6 +31,7 @@ pub fn run() {
             check_niri_running,
             niri_msg,
             get_outputs,
+            serialize_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

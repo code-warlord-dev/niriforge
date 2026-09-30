@@ -1,11 +1,7 @@
 {
   "name": "niriforge",
   "private": true,
-<<<<<<< HEAD
   "version": "0.1.9",
-=======
-  "version": "0.1.9",
->>>>>>> 8d96053 (feat(contract): generate the frontend types from the Rust ones)
   "type": "module",
   "scripts": {
     "dev": "vite",

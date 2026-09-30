@@ -22,6 +22,7 @@ export const COMMANDS = [
   "check_niri_running",
   "niri_msg",
   "get_outputs",
+  "serialize_file",
 ] as const;
 
 export type CommandName = (typeof COMMANDS)[number];
