@@ -20,6 +20,10 @@
 //! The document that states the same thing for people is `docs/CONTRACT.md`.
 
 use crate::error::{AppError, AppResult, ValidationError};
+use tracing;
+use crate::fs::paths;
+use crate::kdl;
+use crate::niri::ipc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -157,8 +161,38 @@ pub fn contract_schema() -> schemars::schema::RootSchema {
 #[command]
 #[allow(unused_variables)]
 pub async fn load_config(path: Option<PathBuf>) -> AppResult<ConfigDto> {
-    // TODO: Implement config loading with KDL parsing
-    Err(AppError::other("Not implemented yet"))
+    // Resolve config path with XDG priority
+    let config_path = match path {
+        Some(p) => p,
+        None => crate::fs::paths::get_niri_config_path()?,
+    };
+
+    // Log what we're loading
+    tracing::info!("Loading niri config from: {}", config_path.display());
+
+    // Parse config with KDL engine (includes include resolution)
+    let kdl_config = crate::kdl::parse_config(&config_path)?;
+
+    // Convert to typed Config
+    let config = crate::kdl::to_config(&kdl_config)?;
+
+    // Log what we loaded
+    tracing::info!("Loaded config: {} outputs, {} binds, {} rules",
+        config.outputs.len(),
+        config.binds.binds.len(),
+        config.window_rules.len() + config.layer_rules.len());
+
+    // Get niri version if available
+    let niri_version: Option<String> = None;
+
+    Ok(ConfigDto {
+        config,
+        meta: ConfigMeta {
+            main_path: config_path,
+            included_files: kdl_config.includes.files.clone(),
+            niri_version,
+        },
+    })
 }
 
 #[command]
