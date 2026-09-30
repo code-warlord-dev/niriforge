@@ -102,6 +102,69 @@ jobs:
       - name: Test
         run: cargo test
 
+  coverage:
+    name: Backend Coverage (tarpaulin)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src-tauri
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies (GTK/glib for Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libglib2.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libasound2-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Installed from source rather than a dev-dependency: as a dev-dependency
+      # tarpaulin takes over `cargo test`, which would change what the backend
+      # gate actually runs. Version and lockfile are pinned so the binary is
+      # reproducible.
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.37.5 --locked
+
+      # No --fail-under: the figure is reported, not enforced. A test failure
+      # inside the run still fails the step.
+      - name: Measure coverage
+        run: cargo tarpaulin --engine ptrace --out Lcov --lib --tests
+
+      - name: Report coverage
+        run: |
+          {
+            echo "### Backend coverage"
+            echo
+            echo '| File | Covered | Total | % |'
+            echo '|-----|---------|-------|---|'
+            awk -F: '
+              /^SF:/  { file = $2; sub(/.*\/src-tauri\//, "", file) }
+              /^LF:/  { total = $2 }
+              /^LH:/  { printf "| `%s` | %d | %d | %.1f%% |\n", file, $2, total, ($2 ? 100 * $2 / total : 0); file = "" }
+            ' lcov.info
+            echo
+            awk -F: '/^LF:/{t+=$2} /^LH:/{c+=$2} END{printf "**Total: %d/%d lines, %.2f%%**\n", c, t, 100*c/t}' lcov.info
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload lcov report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: src-tauri/lcov.info
+
   tauri-build:
     name: Tauri Build (Linux)
     runs-on: ubuntu-latest

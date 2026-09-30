@@ -25,13 +25,13 @@ pnpm dev          # только Vite
 pnpm build
 pnpm lint
 pnpm typecheck
-pnpm test
 
 # Backend
 cd src-tauri
 cargo check
 cargo test
 cargo clippy
+cargo tarpaulin --engine ptrace --out Lcov --lib --tests
 
 # Полный
 pnpm tauri dev
@@ -72,6 +72,33 @@ pnpm tauri build
 4. Подключить в router / sidebar.
 5. Написать тесты.
 6. Обновить документацию.
+
+## Покрытие кода
+
+Покрытие измеряется по **Rust-крейту** (`src-tauri`). Фронтенд-тестов в проекте нет,
+поэтому в проценте их нет — см. [docs/ARCHITECTURE.md](../ARCHITECTURE.md).
+
+```bash
+cd src-tauri
+cargo tarpaulin --engine ptrace --out Lcov --lib --tests
+```
+
+Инструмент: `cargo-tarpaulin` 0.37.5, ставится один раз
+
+```bash
+cargo install cargo-tarpaulin --version 0.37.5 --locked
+```
+
+Отчёт: `src-tauri/lcov.info` (формат LCOV) плюс таблица по файлам в stdout.
+`--engine ptrace` — дефолт; `-C instrument-coverage` из LLVM здесь не нужен,
+поэтому nightly не требуется и CI остаётся на `stable`.
+
+Тот же запуск делает джоба `Backend Coverage (tarpaulin)` и кладёт разбивку по
+файлам в summary шага. Процент **не** является гейтом: падать сборка должна от
+`cargo clippy -- -D warnings` и `cargo test`, а не от цифры покрытия.
+
+Обновляйте число в бейдже README и в `CHANGELOG.md` при каждом релизе —
+оно считается вручную и само не обновится.
 
 ## Тестирование KDL
 

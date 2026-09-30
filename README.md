@@ -1,12 +1,11 @@
 # NiriForge
 
-[![version v0.1.5](https://img.shields.io/github/v/tag/code-warlord-dev/niriforge?label=version&sort=semver)](https://github.com/code-warlord-dev/niriforge/tags)
+[![version v0.1.7](https://img.shields.io/github/v/tag/code-warlord-dev/niriforge?label=version&sort=semver)](https://github.com/code-warlord-dev/niriforge/tags)
 [![CI](https://github.com/code-warlord-dev/niriforge/actions/workflows/ci.yml/badge.svg)](https://github.com/code-warlord-dev/niriforge/actions/workflows/ci.yml)
+[![coverage 72.75%](https://img.shields.io/badge/coverage-72.75%25-4c1.svg)](docs/guides/DEVELOPMENT.md#покрытие-кода)
+[![Rust edition 2021](https://img.shields.io/badge/Rust-2021-000?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat&logo=tauri&logoColor=white)](https://tauri.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tauri 2](https://img.shields.io/badge/Tauri-2-555?style=flat)](src-tauri/Cargo.toml)
-[![Rust edition 2021](https://img.shields.io/badge/Rust-edition%202021-555?style=flat)](src-tauri/Cargo.toml)
-[![Linux](https://img.shields.io/badge/platform-Linux-555?style=flat)](docs/VERSIONING.md)
-[![Wayland](https://img.shields.io/badge/display%20server-Wayland-555?style=flat)](docs/VERSIONING.md)
 
 GUI configuration tool for the [niri](https://github.com/niri-wm/niri) Wayland compositor.
 
