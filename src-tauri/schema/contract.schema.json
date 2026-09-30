@@ -2343,6 +2343,7 @@
       }
     },
     "ValidationError": {
+      "description": "One problem found in a config, with the place it was found.\n\nThis is the only definition of it in the crate: the validation layer fills these in and the frontend renders them, so two shapes with the same name could only ever mean that one of them was wrong.",
       "type": "object",
       "required": [
         "message"

@@ -232,6 +232,11 @@ impl From<IncludeError> for AppError {
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
+/// One problem found in a config, with the place it was found.
+///
+/// This is the only definition of it in the crate: the validation layer fills
+/// these in and the frontend renders them, so two shapes with the same name
+/// could only ever mean that one of them was wrong.
 pub struct ValidationError {
     pub file: Option<String>,
     pub line: Option<usize>,
