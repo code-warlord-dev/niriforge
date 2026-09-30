@@ -28,6 +28,7 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use tracing::{debug, error, trace, warn};
 
 /// Mode for a config file created where none existed yet.
 ///
@@ -102,6 +103,7 @@ impl Drop for StagedFile {
 
 /// Write text to a file atomically.
 pub async fn write_atomic(path: &Path, content: &str) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "write_atomic called for: {}", path.display());
     write_atomic_bytes(path, content.as_bytes()).await
 }
 
@@ -112,7 +114,9 @@ pub async fn write_atomic(path: &Path, content: &str) -> AppResult<()> {
 /// over, so a config that was `0600` stays `0600` and a config that was
 /// `0644` does not silently become world-writable or private.
 pub async fn write_atomic_bytes(path: &Path, content: &[u8]) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "write_atomic_bytes called for: {}", path.display());
     let target = resolve_write_target(path)?;
+    debug!(target: "niriforge::fs::atomic", "resolved write target: {}", target.display());
     write_replacing(&target, content, None)
 }
 
@@ -132,6 +136,7 @@ pub async fn write_atomic_bytes_faulted(
 /// `target` must already be symlink-free; [`resolve_write_target`] is what turns
 /// a user-visible path into one.
 fn write_replacing(target: &Path, content: &[u8], fault: Option<FaultPoint>) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "write_replacing called for: {}", target.display());
     let dir = parent_dir(target)?;
     // Read the mode before anything is replaced: afterwards the target's own
     // metadata is gone and there would be nothing left to copy it from.
@@ -142,6 +147,7 @@ fn write_replacing(target: &Path, content: &[u8], fault: Option<FaultPoint>) -> 
     let file = open_staged(&staged)?;
 
     if fault == Some(FaultPoint::BeforeFsync) {
+        warn!(target: "niriforge::fs::atomic", "fault injected: BeforeFsync for {}", target.display());
         return Err(AppError::atomic_write(format!(
             "{}: write interrupted before the content was forced to disk",
             target.display()
@@ -150,12 +156,14 @@ fn write_replacing(target: &Path, content: &[u8], fault: Option<FaultPoint>) -> 
     file.sync_all()
         .map_err(|err| AppError::atomic_write(format!("{}: {err}", staged.display())))?;
     if fault == Some(FaultPoint::AfterFsync) {
+        warn!(target: "niriforge::fs::atomic", "fault injected: AfterFsync for {}", target.display());
         return Err(AppError::atomic_write(format!(
             "{}: write interrupted after the content was forced to disk",
             target.display()
         )));
     }
     if fault == Some(FaultPoint::BeforeRename) {
+        warn!(target: "niriforge::fs::atomic", "fault injected: BeforeRename for {}", target.display());
         return Err(AppError::atomic_write(format!(
             "{}: write interrupted before the swap",
             target.display()
@@ -164,6 +172,7 @@ fn write_replacing(target: &Path, content: &[u8], fault: Option<FaultPoint>) -> 
     drop(file);
 
     if let Err(err) = fs::rename(&staged, target) {
+        error!(target: "niriforge::fs::atomic", "rename failed for {}: {}", target.display(), err);
         return Err(AppError::atomic_write(format!(
             "{}: could not replace the file: {err}",
             target.display()
@@ -171,12 +180,14 @@ fn write_replacing(target: &Path, content: &[u8], fault: Option<FaultPoint>) -> 
     }
     guard.disarm();
     sync_dir(dir);
+    debug!(target: "niriforge::fs::atomic", "atomic write completed for: {}", target.display());
     Ok(())
 }
 
 /// Create a sibling of `target` holding `content`, forced to disk, and return
 /// its path. The caller decides when - and whether - to put it in place.
 pub fn stage_bytes(target: &Path, content: &[u8]) -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::atomic", "stage_bytes called for: {}", target.display());
     let dir = parent_dir(target)?;
     stage_file(target, content, dir, TEMP_SUFFIX, target_mode(target)?)
 }
@@ -187,6 +198,7 @@ pub fn stage_bytes(target: &Path, content: &[u8]) -> AppResult<PathBuf> {
 /// rather than an anonymous temporary, and the file sits in the same directory
 /// as its target so that `rename` stays inside one filesystem.
 pub fn stage_candidate(target: &Path, content: &[u8]) -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::atomic", "stage_candidate called for: {}", target.display());
     let dir = parent_dir(target)?;
     let mut name = file_name_of(target)?.to_os_string();
     name.push(CANDIDATE_SUFFIX);
@@ -207,6 +219,7 @@ pub fn stage_candidate(target: &Path, content: &[u8]) -> AppResult<PathBuf> {
 /// not fatal, because reporting a failed save for a write that did land would
 /// leave the user believing their config was not saved when it was.
 pub fn commit_staged(staged: &Path, target: &Path) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "commit_staged: {} -> {}", staged.display(), target.display());
     let file = File::open(staged)
         .map_err(|err| AppError::atomic_write(format!("{}: {err}", staged.display())))?;
     file.sync_all()
@@ -214,6 +227,7 @@ pub fn commit_staged(staged: &Path, target: &Path) -> AppResult<()> {
     drop(file);
 
     fs::rename(staged, target).map_err(|err| {
+        error!(target: "niriforge::fs::atomic", "commit_staged rename failed: {} -> {}: {}", staged.display(), target.display(), err);
         AppError::atomic_write(format!(
             "{}: could not replace the file: {err}",
             target.display()
@@ -222,11 +236,13 @@ pub fn commit_staged(staged: &Path, target: &Path) -> AppResult<()> {
     if let Some(dir) = target.parent() {
         sync_dir(dir);
     }
+    debug!(target: "niriforge::fs::atomic", "commit_staged completed: {}", target.display());
     Ok(())
 }
 
 /// Delete a staged file if it is there. A missing file is success.
 pub fn remove_staged(staged: &Path) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "remove_staged called for: {}", staged.display());
     remove_stale_candidate(staged)
 }
 
@@ -236,6 +252,7 @@ pub fn remove_staged(staged: &Path) -> AppResult<()> {
 /// privileged, and a config that ends up owned by whoever happened to run the
 /// editor is a different problem from one that is world-writable.
 pub fn preserve_metadata(source: &Path, dest: &Path) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "preserve_metadata: {} -> {}", source.display(), dest.display());
     let mode = file_mode(source)?;
     fs::set_permissions(dest, Permissions::from_mode(mode))
         .map_err(|err| AppError::atomic_write(format!("{}: {err}", dest.display())))
@@ -257,6 +274,7 @@ pub fn file_mode(path: &Path) -> AppResult<u32> {
 /// not exist yet is resolved through its parent directory, so the file lands in
 /// the real directory even when the directory itself is a link.
 pub fn resolve_write_target(path: &Path) -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::atomic", "resolve_write_target called for: {}", path.display());
     let mut current = path.to_path_buf();
     for _ in 0..MAX_SYMLINK_HOPS {
         let meta = match fs::symlink_metadata(&current) {
@@ -267,10 +285,11 @@ pub fn resolve_write_target(path: &Path) -> AppResult<PathBuf> {
                 return resolve_missing(&current);
             }
             Err(err) => {
+                error!(target: "niriforge::fs::atomic", "symlink_metadata failed for {}: {}", current.display(), err);
                 return Err(AppError::symlink_resolution(format!(
                     "{}: {err}",
                     current.display()
-                )))
+                )));
             }
         };
         if !meta.file_type().is_symlink() {
@@ -280,12 +299,14 @@ pub fn resolve_write_target(path: &Path) -> AppResult<PathBuf> {
         }
         let target = fs::read_link(&current)
             .map_err(|err| AppError::symlink_resolution(format!("{}: {err}", current.display())))?;
+        debug!(target: "niriforge::fs::atomic", "following symlink: {} -> {}", current.display(), target.display());
         current = if target.is_absolute() {
             target
         } else {
             parent_dir(&current)?.join(target)
         };
     }
+    error!(target: "niriforge::fs::atomic", "too many symlinks in path: {}", path.display());
     Err(AppError::symlink_resolution(format!(
         "{}: more than {MAX_SYMLINK_HOPS} symlinks in the path",
         path.display()
@@ -309,6 +330,7 @@ fn stage_file(
     suffix: &str,
     mode: u32,
 ) -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::atomic", "stage_file called for target: {}, dir: {}", target.display(), dir.display());
     let name = file_name_of(target)?;
     for _ in 0..64 {
         let candidate = unique_temp_name(dir, name, suffix);
@@ -327,17 +349,20 @@ fn stage_file(
                     )));
                 }
                 write_and_sync(file, &candidate, content)?;
+                debug!(target: "niriforge::fs::atomic", "staged file created: {}", candidate.display());
                 return Ok(candidate);
             }
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(err) => {
+                error!(target: "niriforge::fs::atomic", "failed to create staged file in {}: {}", dir.display(), err);
                 return Err(AppError::atomic_write(format!(
                     "{}: could not create a file to write into: {err}",
                     dir.display()
-                )))
+                )));
             }
         }
     }
+    error!(target: "niriforge::fs::atomic", "could not find unused temporary file name in: {}", dir.display());
     Err(AppError::atomic_write(format!(
         "{}: could not find an unused temporary file name",
         dir.display()
@@ -349,6 +374,7 @@ fn stage_file(
 /// Used for the config candidates, whose name is derived from the target so that
 /// a crash leaves something identifiable in the directory.
 fn stage_named(candidate: &Path, content: &[u8], mode: u32) -> AppResult<PathBuf> {
+    trace!(target: "niriforge::fs::atomic", "stage_named called for: {}", candidate.display());
     let file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -378,6 +404,7 @@ fn stage_named(candidate: &Path, content: &[u8], mode: u32) -> AppResult<PathBuf
         content,
     )?;
     guard.disarm();
+    debug!(target: "niriforge::fs::atomic", "staged candidate created: {}", candidate.display());
     Ok(candidate.to_path_buf())
 }
 
@@ -386,6 +413,7 @@ fn stage_named(candidate: &Path, content: &[u8], mode: u32) -> AppResult<PathBuf
 /// The guard's `Drop` removes the file if this returns an error, so a partially
 /// written staged file is never left where another run could pick it up.
 fn write_and_sync(mut file: File, path: &Path, content: &[u8]) -> AppResult<()> {
+    trace!(target: "niriforge::fs::atomic", "write_and_sync: {} ({} bytes)", path.display(), content.len());
     file.write_all(content)
         .and_then(|()| file.sync_all())
         .map_err(|err| AppError::atomic_write(format!("{}: {err}", path.display())))

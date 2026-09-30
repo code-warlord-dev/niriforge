@@ -26,6 +26,7 @@
 
 use crate::error::AppResult;
 use kdl::{KdlDocument, KdlNode};
+use tracing::trace;
 
 /// Serialize a KDL document to a string, preserving the formatting it was
 /// parsed with.
@@ -33,6 +34,7 @@ use kdl::{KdlDocument, KdlNode};
 /// The result is byte-identical to the input for any document produced by
 /// `crate::kdl::parser::parse_kdl`, which makes load -> save a no-op on disk.
 pub fn serialize_kdl(doc: &KdlDocument) -> AppResult<String> {
+    trace!(target: "niriforge::kdl::serializer", "serialize_kdl: {} nodes", doc.nodes().len());
     Ok(doc.to_string())
 }
 
@@ -41,6 +43,7 @@ pub fn serialize_kdl(doc: &KdlDocument) -> AppResult<String> {
 /// Used for surgical writes, where one node of a document is replaced and the
 /// rest of the file must come out untouched.
 pub fn serialize_node(node: &KdlNode) -> AppResult<String> {
+    trace!(target: "niriforge::kdl::serializer", "serialize_node: {}", node.name().value());
     Ok(node.to_string())
 }
 

@@ -3,9 +3,11 @@
 use crate::error::{describe_kdl_error, KdlError, KdlLocation};
 use kdl::{KdlDocument, KdlNode};
 use std::path::Path;
+use tracing::trace;
 
 /// Parse a KDL file into a document, preserving spans for source-map integration.
 pub fn parse_file(path: &Path) -> Result<KdlDocument, KdlError> {
+    trace!(target: "niriforge::kdl::parser", "parse_file: {}", path.display());
     // `read_to_string` rejects invalid UTF-8 before we ever see the bytes, so
     // anything that reaches the parser below is valid UTF-8 by construction.
     let content = std::fs::read_to_string(path).map_err(|e| KdlError::Io {
@@ -22,6 +24,7 @@ pub fn parse_file(path: &Path) -> Result<KdlDocument, KdlError> {
 /// "expected valid value" is useless for finding a typo in a hand-written
 /// config.
 pub fn parse_kdl(content: &str, path: &Path) -> Result<KdlDocument, KdlError> {
+    trace!(target: "niriforge::kdl::parser", "parse_kdl: {} ({} bytes)", path.display(), content.len());
     content
         .parse::<KdlDocument>()
         .map_err(|err| KdlError::Parse {

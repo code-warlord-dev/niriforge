@@ -23,19 +23,23 @@ use crate::error::{AppError, AppResult};
 use crate::schema::Config;
 use include::KdlConfigSet;
 use std::path::{Path, PathBuf};
+use tracing::trace;
 
 /// Read a config and everything it includes.
 pub fn parse_config(main_path: &Path) -> AppResult<KdlConfigSet> {
+    trace!(target: "niriforge::kdl", "parse_config: {}", main_path.display());
     include::load_config_set(main_path)
 }
 
 /// Project a config set into the typed model.
 pub fn to_config(set: &KdlConfigSet) -> AppResult<Config> {
+    trace!(target: "niriforge::kdl", "to_config called");
     mapping::to_config(set).map_err(|e| AppError::schema_validation(e.to_string()))
 }
 
 /// Project a config set into the typed model, with a list of what did not fit.
 pub fn to_config_with_report(set: &KdlConfigSet) -> AppResult<(Config, mapping::ConfigReport)> {
+    trace!(target: "niriforge::kdl", "to_config_with_report called");
     mapping::to_config_with_report(set).map_err(|e| AppError::schema_validation(e.to_string()))
 }
 
@@ -45,6 +49,7 @@ pub fn to_config_with_report(set: &KdlConfigSet) -> AppResult<(Config, mapping::
 /// back up and what to rewrite. A config that was loaded and not edited comes
 /// back as an empty list, because nothing was written.
 pub fn apply_config(set: &mut KdlConfigSet, config: &Config) -> AppResult<Vec<PathBuf>> {
+    trace!(target: "niriforge::kdl", "apply_config called");
     mapping::apply_config(set, config).map_err(|err| match err {
         mapping::ApplyError::At {
             file,
@@ -62,6 +67,7 @@ pub fn apply_config(set: &mut KdlConfigSet, config: &Config) -> AppResult<Vec<Pa
 /// document is rendered through `Display` and never through `fmt`; see
 /// [`serializer`] for why the pretty-printer is not on this path.
 pub fn serialize_file(set: &KdlConfigSet, path: &Path) -> AppResult<String> {
+    trace!(target: "niriforge::kdl", "serialize_file: {}", path.display());
     let file = set.file(path).ok_or_else(|| {
         AppError::other(format!("no such file in config set: {}", path.display()))
     })?;
@@ -70,6 +76,7 @@ pub fn serialize_file(set: &KdlConfigSet, path: &Path) -> AppResult<String> {
 
 /// Render every file of a config set, in resolution order.
 pub fn serialize_all(set: &KdlConfigSet) -> AppResult<Vec<(PathBuf, String)>> {
+    trace!(target: "niriforge::kdl", "serialize_all called: {} files", set.files.len());
     set.files
         .iter()
         .map(|f| Ok((f.path.clone(), serializer::serialize_kdl(&f.doc)?)))
