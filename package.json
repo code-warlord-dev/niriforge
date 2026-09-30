@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "gen:contract": "cd src-tauri && cargo run --quiet --example export_contract > schema/contract.schema.json.tmp && mv schema/contract.schema.json.tmp schema/contract.schema.json",
-    "gen:types": "pnpm gen:contract && json2ts -i src-tauri/schema/contract.schema.json -o src/types/generated/contract.ts --additionalProperties false --unreachableDefinitions",
+    "gen:types": "pnpm gen:contract && json2ts -i src-tauri/schema/contract.schema.json -o src/types/generated/contract.ts --additionalProperties false --unreachableDefinitions --jsDoc",
     "check:contract": "pnpm gen:types && git diff --exit-code -- src/types/generated src-tauri/schema"
   },
   "dependencies": {
