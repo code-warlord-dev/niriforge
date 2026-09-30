@@ -228,6 +228,10 @@ impl From<IncludeError> for AppError {
     }
 }
 
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub struct ValidationError {
     pub file: Option<String>,
     pub line: Option<usize>,
