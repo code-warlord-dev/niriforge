@@ -15,6 +15,7 @@ import {
   Settings,
   Database,
   FileCode,
+  LayoutDashboard,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -28,6 +29,7 @@ interface SidebarProps {
 }
 
 const pages = [
+  { id: "overview", icon: LayoutDashboard, translationKey: "sidebar.overview" },
   { id: "outputs", icon: Monitor, translationKey: "sidebar.outputs" },
   { id: "input", icon: Keyboard, translationKey: "sidebar.input" },
   { id: "binds", icon: Keyboard, translationKey: "sidebar.binds" },

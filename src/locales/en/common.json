@@ -9,6 +9,7 @@
     "light": "Light"
   },
   "sidebar": {
+    "overview": "Overview",
     "outputs": "Outputs",
     "input": "Input",
     "binds": "Binds",
@@ -113,5 +114,81 @@
     "copy_kdl": "Copy KDL",
     "identify": "Identify",
     "kdl_collapsed": "KDL block collapsed — click to expand"
+  },
+  "overview": {
+    "empty_title": "No configuration loaded",
+    "empty_description": "Open your niri config.kdl to start. No sample data is used.",
+    "reload_config": "Load Configuration",
+    "stats": {
+      "outputs": "Outputs",
+      "outputs_desc": "Configured monitors",
+      "binds": "Key Binds",
+      "binds_desc": "Total key bindings",
+      "rules": "Window Rules",
+      "rules_desc": "Window + layer rules"
+    },
+    "config": {
+      "title": "Configuration",
+      "path": "Config Path",
+      "no_path": "No config loaded",
+      "last_modified": "Last Modified",
+      "modified_recently": "Recently",
+      "unknown": "Unknown",
+      "validation_status": "Validation Status",
+      "validation_valid": "Valid",
+      "validation_invalid": "Invalid ({{count}} errors)",
+      "validation_warning": "Warnings ({{count}})",
+      "validation_unknown": "Not validated",
+      "includes": "{{count}} included file(s)"
+    },
+    "ipc": {
+      "title": "IPC Connection",
+      "status": "Status",
+      "version": "niri Version",
+      "socket": "Socket Path",
+      "running": "Running",
+      "not_running": "Not Running",
+      "checking": "Checking…",
+      "refresh": "Refresh",
+      "version_unknown": "Unknown",
+      "socket_unavailable": "Unavailable",
+      "n_a": "N/A",
+      "niri_not_running_hint": "Start niri to enable live features"
+    },
+    "schema": {
+      "title": "Schema",
+      "version": "Schema Version",
+      "niri_version": "niri built-in",
+      "coverage": "Coverage",
+      "known_fields": "{{count}} known fields",
+      "unknown_fields": "{{count}} unknown field(s)",
+      "unknown_fields_desc": "{{errors}} errors, {{warnings}} warnings",
+      "none": "None",
+      "unknown_fields_note": "Unknown fields are preserved on save but not editable in the UI."
+    },
+    "operations": {
+      "dirty_indicator": "Unsaved changes"
+    },
+    "validation": {
+      "title": "Validation Diagnostics",
+      "no_issues": "No issues found",
+      "no_issues_desc": "Configuration is valid and ready to use.",
+      "errors": "{{count}} error(s)",
+      "warnings": "{{count}} warning(s)"
+    },
+    "workspaces": {
+      "title": "Workspaces ({{count}})",
+      "empty": "No workspaces configured",
+      "custom_layout": "Custom Layout"
+    },
+    "backups": {
+      "title": "Recent Snapshots ({{count}})",
+      "create": "Create Backup",
+      "manual_name": "Manual Backup",
+      "unnamed": "Unnamed Backup",
+      "restore": "Restore",
+      "confirm_delete": "Delete this backup?",
+      "empty": "No backups yet"
+    }
   }
 }

@@ -9,6 +9,7 @@
     "light": "Светлая"
   },
   "sidebar": {
+    "overview": "Обзор",
     "outputs": "Мониторы",
     "input": "Ввод",
     "binds": "Бинды",
@@ -113,5 +114,81 @@
     "copy_kdl": "Копировать KDL",
     "identify": "Идентифицировать",
     "kdl_collapsed": "KDL блок свёрнут — нажмите для развёртывания"
+  },
+  "overview": {
+    "empty_title": "Конфигурация не загружена",
+    "empty_description": "Откройте ваш config.kdl niri, чтобы начать. Демо-данные не используются.",
+    "reload_config": "Загрузить конфигурацию",
+    "stats": {
+      "outputs": "Мониторы",
+      "outputs_desc": "Настроенные мониторы",
+      "binds": "Бинды",
+      "binds_desc": "Всего биндов",
+      "rules": "Правила окон",
+      "rules_desc": "Правила окон + слоёв"
+    },
+    "config": {
+      "title": "Конфигурация",
+      "path": "Путь к конфигу",
+      "no_path": "Конфиг не загружен",
+      "last_modified": "Последнее изменение",
+      "modified_recently": "Недавно",
+      "unknown": "Неизвестно",
+      "validation_status": "Статус валидации",
+      "validation_valid": "Валидно",
+      "validation_invalid": "Невалидно ({{count}} ошибок)",
+      "validation_warning": "Предупреждения ({{count}})",
+      "validation_unknown": "Не проверено",
+      "includes": "{{count}} подключённых файл(ов)"
+    },
+    "ipc": {
+      "title": "IPC соединение",
+      "status": "Статус",
+      "version": "Версия niri",
+      "socket": "Путь к сокету",
+      "running": "Запущен",
+      "not_running": "Не запущен",
+      "checking": "Проверка…",
+      "refresh": "Обновить",
+      "version_unknown": "Неизвестно",
+      "socket_unavailable": "Недоступен",
+      "n_a": "Н/Д",
+      "niri_not_running_hint": "Запустите niri для включения live-функций"
+    },
+    "schema": {
+      "title": "Схема",
+      "version": "Версия схемы",
+      "niri_version": "встроенная в niri",
+      "coverage": "Покрытие",
+      "known_fields": "{{count}} известных полей",
+      "unknown_fields": "{{count}} неизвестное поле/поля",
+      "unknown_fields_desc": "{{errors}} ошибок, {{warnings}} предупреждений",
+      "none": "Нет",
+      "unknown_fields_note": "Неизвестные поля сохраняются при сохранении, но не редактируются в UI."
+    },
+    "operations": {
+      "dirty_indicator": "Есть несохранённые изменения"
+    },
+    "validation": {
+      "title": "Диагностика валидации",
+      "no_issues": "Проблем не найдено",
+      "no_issues_desc": "Конфигурация валидна и готова к использованию.",
+      "errors": "{{count}} ошибок",
+      "warnings": "{{count}} предупреждений"
+    },
+    "workspaces": {
+      "title": "Рабочие столы ({{count}})",
+      "empty": "Рабочие столы не настроены",
+      "custom_layout": "Своя раскладка"
+    },
+    "backups": {
+      "title": "Последние снимки ({{count}})",
+      "create": "Создать бэкап",
+      "manual_name": "Ручной бэкап",
+      "unnamed": "Без имени",
+      "restore": "Восстановить",
+      "confirm_delete": "Удалить этот бэкап?",
+      "empty": "Бэкапов пока нет"
+    }
   }
 }

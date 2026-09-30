@@ -7,6 +7,7 @@ import { ValidationPanel } from "@/components/validation/ValidationPanel";
 import { EmptyState } from "@/components/pages/EmptyState";
 import { SectionPlaceholder } from "@/components/pages/SectionPlaceholder";
 import { OutputsPage } from "@/pages/OutputsPage";
+import { OverviewPage } from "@/pages/OverviewPage";
 import { useConfigStore } from "@/stores/configStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useValidationStore } from "@/stores/validationStore";
@@ -188,6 +189,8 @@ function App() {
                 errorMessage={errorText}
                 onOpen={handleOpen}
               />
+            ) : activePage === "overview" ? (
+              <OverviewPage />
             ) : activePage === "outputs" ? (
               <OutputsPage />
             ) : (
