@@ -1,28 +1,21 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { invokeCommand, toAppError } from "@/lib/ipc";
+import type { AppError, BackupMeta } from "@/types/config";
 
-export interface BackupMeta {
-  id: string;
-  name: string;
-  type: "auto" | "named";
-  timestamp: number;
-  niriVersion?: string;
-  sourceFiles: string[];
-  comment?: string;
-  size: number;
-}
+export type { BackupMeta };
 
-export interface BackupState {
+interface BackupState {
   backups: BackupMeta[];
   loading: boolean;
-  error: Error | null;
+  error: AppError | null;
 
   fetchBackups: () => Promise<void>;
   restore: (id: string) => Promise<void>;
   create: (name?: string, comment?: string) => Promise<BackupMeta>;
   delete: (id: string) => Promise<void>;
   setLoading: (loading: boolean) => void;
-  setError: (error: Error | null) => void;
+  setError: (error: AppError | null) => void;
 }
 
 export const useBackupStore = create<BackupState>()(
@@ -34,22 +27,20 @@ export const useBackupStore = create<BackupState>()(
     fetchBackups: async () => {
       set({ loading: true, error: null });
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const backups = await invoke<BackupMeta[]>("list_backups");
+        const backups = await invokeCommand<BackupMeta[]>("list_backups");
         set({ backups, loading: false });
       } catch (err) {
-        set({ error: err as Error, loading: false });
+        set({ error: toAppError(err), loading: false });
       }
     },
 
     restore: async (id: string) => {
       set({ loading: true, error: null });
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("restore_backup", { id });
+        await invokeCommand<null>("restore_backup", { id });
         set({ loading: false });
       } catch (err) {
-        set({ error: err as Error, loading: false });
+        set({ error: toAppError(err), loading: false });
         throw err;
       }
     },
@@ -57,12 +48,14 @@ export const useBackupStore = create<BackupState>()(
     create: async (name?: string, comment?: string) => {
       set({ loading: true, error: null });
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const backup = await invoke<BackupMeta>("create_backup", { name, comment });
-        set((state) => { state.backups.unshift(backup); state.loading = false; });
+        const backup = await invokeCommand<BackupMeta>("create_backup", { name, comment });
+        set((state) => {
+          state.backups.unshift(backup);
+          state.loading = false;
+        });
         return backup;
       } catch (err) {
-        set({ error: err as Error, loading: false });
+        set({ error: toAppError(err), loading: false });
         throw err;
       }
     },
@@ -70,11 +63,13 @@ export const useBackupStore = create<BackupState>()(
     delete: async (id: string) => {
       set({ loading: true, error: null });
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("delete_backup", { id });
-        set((state) => { state.backups = state.backups.filter((b: BackupMeta) => b.id !== id); state.loading = false; });
+        await invokeCommand<null>("delete_backup", { id });
+        set((state) => {
+          state.backups = state.backups.filter((backup) => backup.id !== id);
+          state.loading = false;
+        });
       } catch (err) {
-        set({ error: err as Error, loading: false });
+        set({ error: toAppError(err), loading: false });
         throw err;
       }
     },

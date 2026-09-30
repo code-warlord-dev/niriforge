@@ -44,6 +44,9 @@ pnpm tauri build
 
 - Rust: snake_case, типы PascalCase.
 - TypeScript: camelCase, типы/компоненты PascalCase.
+- На проводе (invoke) — kebab-case для всех полей, включая TypeScript: типы
+  генерируются из Rust, где стоит `#[serde(rename_all = "kebab-case")]`.
+  Подробно — в [CONTRACT.md](../CONTRACT.md).
 - Файлы компонентов: PascalCase.tsx.
 - Stores: `useXxxStore`.
 
@@ -64,9 +67,23 @@ pnpm tauri build
 - CI должен быть зелёным.
 - Для schema/KDL — обязательны тесты round-trip.
 
+## Контракт с интерфейсом
+
+Форма данных на границе описана в [CONTRACT.md](../CONTRACT.md). TypeScript-типы
+не пишутся руками: они генерируются из Rust-типов.
+
+```bash
+pnpm gen:types      # Rust -> schema -> src/types/generated/contract.ts
+pnpm check:contract # регенерация должна не давать diff (это же проверяет CI)
+```
+
+Если меняется поле или команда: правка Rust → `pnpm gen:types` → правка
+потребителей. Проверки: `cargo test`, `cargo clippy -- -D warnings`,
+`pnpm typecheck`, `pnpm lint`.
+
 ## Добавление новой секции niri
 
-1. Обновить `schema` (Rust + TS types + Zod).
+1. Обновить `schema` (Rust) и выполнить `pnpm gen:types`.
 2. Добавить serializer/parser mapping в kdl engine.
 3. Создать page + компоненты.
 4. Подключить в router / sidebar.

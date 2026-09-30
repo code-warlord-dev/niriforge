@@ -8,6 +8,9 @@ build/
 src-tauri/target/
 src-tauri/gen/
 
+# Generated contract (written atomically by `pnpm gen:contract`)
+src-tauri/schema/*.tmp
+
 # Tauri
 src-tauri/*.app
 src-tauri/*.dmg

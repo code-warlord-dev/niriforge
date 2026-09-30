@@ -25,6 +25,8 @@ pub fn run() {
             validate_config,
             list_backups,
             restore_backup,
+            create_backup,
+            delete_backup,
             get_config_path,
             check_niri_running,
             niri_msg,

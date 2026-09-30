@@ -1,0 +1,2606 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Contract",
+  "description": "The root of the wire contract.\n\nIt is not a payload of any command. It exists so that one schema names every type the frontend can see, which is what makes \"generate the TypeScript from this\" a complete statement rather than a partial one.",
+  "type": "object",
+  "required": [
+    "app-error",
+    "backup-meta",
+    "config",
+    "config-dto",
+    "config-meta",
+    "output-info",
+    "save-options",
+    "save-result",
+    "validation-error",
+    "validation-result"
+  ],
+  "properties": {
+    "app-error": {
+      "$ref": "#/definitions/AppError"
+    },
+    "backup-meta": {
+      "$ref": "#/definitions/BackupMeta"
+    },
+    "config": {
+      "$ref": "#/definitions/Config"
+    },
+    "config-dto": {
+      "$ref": "#/definitions/ConfigDto"
+    },
+    "config-meta": {
+      "$ref": "#/definitions/ConfigMeta"
+    },
+    "output-info": {
+      "$ref": "#/definitions/OutputInfo"
+    },
+    "save-options": {
+      "$ref": "#/definitions/SaveOptions"
+    },
+    "save-result": {
+      "$ref": "#/definitions/SaveResult"
+    },
+    "validation-error": {
+      "$ref": "#/definitions/ValidationError"
+    },
+    "validation-result": {
+      "$ref": "#/definitions/ValidationResult"
+    }
+  },
+  "definitions": {
+    "AnimationConfig": {
+      "type": "object",
+      "properties": {
+        "duration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "easing": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/EasingConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spring": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SpringConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "AnimationsConfig": {
+      "type": "object",
+      "properties": {
+        "column-switch": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "overview": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "overview-window": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "slowdown": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "window-close": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "window-move": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "window-open": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "window-resize": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workspace-switch": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "AppError": {
+      "description": "What a command returns when it fails.\n\nThe `type` tag is the machine-readable half and the `details` the human-readable one. They are the same string space: the tag is the variant name, which is why the frontend can switch on it and get an exhaustive check, and why no separate `code` field exists to fall out of step with it.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Io"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "KdlParse"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "object",
+              "required": [
+                "message"
+              ],
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              }
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "KdlSerialize"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "SchemaValidation"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "object",
+              "required": [
+                "errors"
+              ],
+              "properties": {
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ValidationError"
+                  }
+                }
+              }
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "NiriValidate"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Backup"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "object",
+              "required": [
+                "path"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              }
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "ConfigNotFound"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "IncludeResolution"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "AtomicWrite"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "SymlinkResolution"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "FileWatch"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Serialization"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Utf8"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Tauri"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "details",
+            "type"
+          ],
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Other"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "BackupMeta": {
+      "type": "object",
+      "required": [
+        "files",
+        "hash",
+        "id",
+        "timestamp"
+      ],
+      "properties": {
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hash": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "niri-version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      }
+    },
+    "BindEntry": {
+      "type": "object",
+      "required": [
+        "action",
+        "key"
+      ],
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "allow-inhibiting": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allow-when-locked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "args": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "cooldown-ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "key": {
+          "type": "string"
+        },
+        "overlay-title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "BindsConfig": {
+      "type": "object",
+      "required": [
+        "binds",
+        "modes"
+      ],
+      "properties": {
+        "binds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BindEntry"
+          }
+        },
+        "modes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/BindEntry"
+            }
+          }
+        }
+      }
+    },
+    "BlurConfig": {
+      "type": "object",
+      "properties": {
+        "brightness": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "contrast": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "noise": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "passes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "radius": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "BorderConfig": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "gradient": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "ClipboardConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "history": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "max-items": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "Config": {
+      "type": "object",
+      "required": [
+        "binds",
+        "environment",
+        "includes",
+        "layer-rules",
+        "outputs",
+        "prefer-no-csd",
+        "spawn-at-startup",
+        "spawn-sh-at-startup",
+        "unknown",
+        "window-rules",
+        "workspaces"
+      ],
+      "properties": {
+        "animations": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnimationsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "binds": {
+          "$ref": "#/definitions/BindsConfig"
+        },
+        "blur": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BlurConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clipboard": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ClipboardConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config-notification": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConfigNotificationConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CursorConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "debug": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DebugConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "gestures": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GesturesConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hotkey-overlay": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HotkeyOverlayConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/IncludeEntry"
+          }
+        },
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layer-rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LayerRule"
+          }
+        },
+        "layout": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LayoutConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OutputConfig"
+          }
+        },
+        "overview": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OverviewConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prefer-no-csd": {
+          "type": "boolean"
+        },
+        "recent-windows": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RecentWindowsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "screenshot-path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spawn-at-startup": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SpawnEntry"
+          }
+        },
+        "spawn-sh-at-startup": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "switch-events": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SwitchEventsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unknown": {
+          "description": "A `serde_json::Value` has no schema, so the frontend sees these as `unknown` and has to narrow before it reads anything. That is the point: the UI is told there is a node here it does not model, and not what it is.",
+          "type": "array",
+          "items": true
+        },
+        "window-rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WindowRule"
+          }
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NamedWorkspace"
+          }
+        },
+        "xwayland-satellite": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/XwaylandSatelliteConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ConfigDto": {
+      "type": "object",
+      "required": [
+        "config",
+        "meta"
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/Config"
+        },
+        "meta": {
+          "$ref": "#/definitions/ConfigMeta"
+        }
+      }
+    },
+    "ConfigMeta": {
+      "description": "What the backend knows about the config it just read.",
+      "type": "object",
+      "required": [
+        "included-files",
+        "main-path"
+      ],
+      "properties": {
+        "included-files": {
+          "description": "Every file that took part, the main one included, in load order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "main-path": {
+          "description": "The file the load was resolved against.",
+          "type": "string"
+        },
+        "niri-version": {
+          "description": "The niri version the config was checked against, if niri answered.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ConfigNotificationConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "position": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "CursorConfig": {
+      "type": "object",
+      "properties": {
+        "hide-after-inactive-ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "hide-when-typing": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "theme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "DebugConfig": {
+      "type": "object",
+      "properties": {
+        "disable-direct-scanout": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dump-frames": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "honor-xdg-activation-token": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "log-level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preview-render": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "EasingConfig": {
+      "type": "object",
+      "required": [
+        "x1",
+        "x2",
+        "y1",
+        "y2"
+      ],
+      "properties": {
+        "x1": {
+          "type": "number",
+          "format": "float"
+        },
+        "x2": {
+          "type": "number",
+          "format": "float"
+        },
+        "y1": {
+          "type": "number",
+          "format": "float"
+        },
+        "y2": {
+          "type": "number",
+          "format": "float"
+        }
+      }
+    },
+    "FocusRingConfig": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "gradient": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "GesturesConfig": {
+      "type": "object",
+      "properties": {
+        "dnd-edge-view-scroll": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dnd-edge-workspace-switch": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hot-corners": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HotCornersConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "HotCornersConfig": {
+      "type": "object",
+      "properties": {
+        "bottom-left": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bottom-right": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "top-left": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "top-right": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "HotkeyOverlayConfig": {
+      "type": "object",
+      "properties": {
+        "delay-ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "IncludeEntry": {
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "optional": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "InputConfig": {
+      "type": "object",
+      "properties": {
+        "focus-follows-mouse": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "keyboard": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/KeyboardConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mod-key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mouse": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MouseConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tablet": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TabletConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "touch": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TouchConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "touchpad": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TouchpadConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trackpoint": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TrackpointConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warp-mouse-to-focus": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "KeyboardConfig": {
+      "type": "object",
+      "properties": {
+        "numlock": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "repeat-delay": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "repeat-rate": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "track-layout": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "xkb": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/XkbConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "LayerRule": {
+      "type": "object",
+      "required": [
+        "match-rules",
+        "namespace"
+      ],
+      "properties": {
+        "anchor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exclude": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MatchRules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "keyboard-interactivity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "layer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Margin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "match-rules": {
+          "$ref": "#/definitions/MatchRules"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      }
+    },
+    "LayoutConfig": {
+      "type": "object",
+      "properties": {
+        "always-center-single-column": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "background-color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "border": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BorderConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "center-focused-column": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default-column-display": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default-column-width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "empty-workspace-above-first": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "focus-ring": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FocusRingConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "preset-column-widths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "preset-window-heights": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ShadowConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "struts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/StrutsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tab-indicator": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TabIndicatorConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Margin": {
+      "type": "object",
+      "properties": {
+        "bottom": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "left": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "right": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "top": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "MatchRules": {
+      "type": "object",
+      "properties": {
+        "app-id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "at-startup": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is-active": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is-floating": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is-focused": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is-fullscreen": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is-maximized": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ModeInfo": {
+      "type": "object",
+      "required": [
+        "height",
+        "preferred",
+        "refresh-rate",
+        "width"
+      ],
+      "properties": {
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "preferred": {
+          "type": "boolean"
+        },
+        "refresh-rate": {
+          "type": "number",
+          "format": "float"
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "MouseConfig": {
+      "type": "object",
+      "properties": {
+        "accel-profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accel-speed": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "left-handed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "natural-scroll": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "off": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "scroll-button": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scroll-method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "NamedWorkspace": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "layout": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LayoutConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "open-on-output": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "OutputConfig": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "backdrop-color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "background-color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "focus-at-startup": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hot-corners": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HotCornersConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layout": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LayoutConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max-bpc": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "off": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Position"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "transform": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variable-refresh-rate": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "OutputInfo": {
+      "type": "object",
+      "required": [
+        "make",
+        "model",
+        "modes",
+        "name",
+        "position",
+        "scale",
+        "serial",
+        "transform",
+        "vrr"
+      ],
+      "properties": {
+        "current-mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "make": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ModeInfo"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/definitions/Position"
+        },
+        "scale": {
+          "type": "number",
+          "format": "float"
+        },
+        "serial": {
+          "type": "string"
+        },
+        "transform": {
+          "type": "string"
+        },
+        "vrr": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OverviewConfig": {
+      "type": "object",
+      "properties": {
+        "backdrop-color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace-shadow": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "zoom": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        }
+      }
+    },
+    "Position": {
+      "type": "object",
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "RecentWindowsConfig": {
+      "type": "object",
+      "properties": {
+        "debounce-ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "highlight": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "open-delay-ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "previews": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "SaveOptions": {
+      "description": "What the caller wants from a save.\n\nThe defaults are the safe ones: a save takes a backup and refuses to write a config that does not validate, unless the caller says otherwise. An omitted field is a decision, so a caller that cares has to say so.",
+      "type": "object",
+      "properties": {
+        "backup-name": {
+          "description": "Label for that backup.",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "create-backup": {
+          "description": "Take a backup before replacing the files.",
+          "default": true,
+          "type": "boolean"
+        },
+        "validate": {
+          "description": "Refuse to write when validation fails.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "SaveResult": {
+      "description": "The outcome of a save that returned successfully.\n\nA save that failed is an `Err`, not a `success: false`: there is no partial outcome to report, and a caller that ignores the error still sees that the file it asked for is not what is on disk.",
+      "type": "object",
+      "required": [
+        "modified-files",
+        "success"
+      ],
+      "properties": {
+        "backup-id": {
+          "description": "The backup that was taken, if one was.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modified-files": {
+          "description": "Every file the write touched, empty when the write was a no-op.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ShadowConfig": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "draw-behind-window": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "offset-x": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "offset-y": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "softness": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "spread": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "SpawnEntry": {
+      "type": "object",
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "args": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "command": {
+          "type": "string"
+        },
+        "env": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "SpringConfig": {
+      "type": "object",
+      "properties": {
+        "damping": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "epsilon": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "mass": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "stiffness": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        }
+      }
+    },
+    "StrutsConfig": {
+      "type": "object",
+      "properties": {
+        "bottom": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "left": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "right": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "top": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      }
+    },
+    "SwitchEventsConfig": {
+      "type": "object",
+      "properties": {
+        "lid-close": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/SpawnEntry"
+          }
+        },
+        "lid-open": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/SpawnEntry"
+          }
+        },
+        "tablet-mode-off": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/SpawnEntry"
+          }
+        },
+        "tablet-mode-on": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/SpawnEntry"
+          }
+        }
+      }
+    },
+    "TabIndicatorConfig": {
+      "type": "object",
+      "properties": {
+        "colors": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "corner-radius": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "gaps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "position": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "TabletConfig": {
+      "type": "object",
+      "properties": {
+        "off": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "TouchConfig": {
+      "type": "object",
+      "properties": {
+        "off": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "TouchpadConfig": {
+      "type": "object",
+      "properties": {
+        "accel-profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accel-speed": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "drag": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dwt": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dwtp": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "left-handed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "middle-emulation": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "natural-scroll": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "off": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "scroll-button": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scroll-method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tap": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "TrackpointConfig": {
+      "type": "object",
+      "properties": {
+        "accel-profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accel-speed": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "left-handed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "natural-scroll": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "off": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "scroll-button": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scroll-method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ValidationError": {
+      "description": "One problem found in a config, with the place it was found.\n\nThis is the only definition of it in the crate: the validation layer fills these in and the frontend renders them, so two shapes with the same name could only ever mean that one of them was wrong.",
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "ValidationResult": {
+      "type": "object",
+      "required": [
+        "errors",
+        "valid",
+        "warnings"
+      ],
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ValidationError"
+          }
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ValidationError"
+          }
+        }
+      }
+    },
+    "WindowRule": {
+      "type": "object",
+      "required": [
+        "match-rules"
+      ],
+      "properties": {
+        "block-out-from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "border": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "clip-to-geometry": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "default-height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "default-width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "exclude": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MatchRules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "focus-ring": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "geometry-corner-radius": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "match-rules": {
+          "$ref": "#/definitions/MatchRules"
+        },
+        "max-height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "max-width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "min-height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "min-width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "opacity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "open-centered": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "open-floating": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "open-fullscreen": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "open-maximized": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "open-tiled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "shadow": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "XkbConfig": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "layout": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "options": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rules": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variant": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "XwaylandSatelliteConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "wm-class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

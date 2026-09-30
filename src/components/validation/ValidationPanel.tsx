@@ -6,19 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
-
-export interface ValidationIssue {
-  id: string;
-  type: "error" | "warning";
-  message: string;
-  location?: {
-    file: string;
-    line: number;
-    column: number;
-  };
-  code?: string;
-  section?: string;
-}
+import type { ValidationIssue } from "@/types/config";
 
 interface ValidationPanelProps {
   errors: ValidationIssue[];
@@ -83,10 +71,21 @@ interface ValidationItemProps {
   onDismiss?: (id: string) => void;
 }
 
+/** `file:line:column`, with the parts the backend did not send left off. */
+function formatLocation(issue: ValidationIssue): string | null {
+  if (issue.file === undefined || issue.file === null) return null;
+  const line = issue.line === undefined || issue.line === null ? "" : `:${issue.line}`;
+  const column = issue.line === undefined || issue.line === null || issue.column === undefined || issue.column === null
+    ? ""
+    : `:${issue.column}`;
+  return `${issue.file}${line}${column}`;
+}
+
 function ValidationItem({ issue, variant, onDismiss }: ValidationItemProps) {
-  const Icon = variant === "error" ? AlertCircle : AlertCircle;
+  const Icon = AlertCircle;
   const iconClass = variant === "error" ? "text-destructive" : "text-yellow-500";
   const borderClass = variant === "error" ? "border-l-destructive" : "border-l-yellow-500";
+  const location = formatLocation(issue);
 
   return (
     <div className={cn("relative p-3 rounded-r-md border-l-4 bg-muted/30", borderClass)}>
@@ -94,15 +93,8 @@ function ValidationItem({ issue, variant, onDismiss }: ValidationItemProps) {
         <Icon className={cn("h-4 w-4 shrink-0 mt-0.5", iconClass)} aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">{issue.message}</p>
-          {issue.location && (
-            <p className="text-xs text-muted-foreground font-mono mt-1">
-              {issue.location.file}:{issue.location.line}:{issue.location.column}
-            </p>
-          )}
-          {issue.section && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Section: {issue.section}
-            </p>
+          {location && (
+            <p className="text-xs text-muted-foreground font-mono mt-1">{location}</p>
           )}
           {issue.code && (
             <p className="text-xs text-muted-foreground mt-1 font-mono">

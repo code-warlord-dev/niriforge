@@ -10,6 +10,7 @@ import { useConfigStore } from "@/stores/configStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useValidationStore } from "@/stores/validationStore";
 import { cn } from "@/lib/utils";
+import { describeAppError, toAppError } from "@/lib/ipc";
 
 /**
  * Application shell.
@@ -24,6 +25,7 @@ function App() {
   const loading = useConfigStore((s) => s.loading);
   const saving = useConfigStore((s) => s.saving);
   const error = useConfigStore((s) => s.error);
+  const errorText = error ? describeAppError(error) : null;
   const load = useConfigStore((s) => s.load);
   const save = useConfigStore((s) => s.save);
   const validate = useConfigStore((s) => s.validate);
@@ -57,16 +59,18 @@ function App() {
           variant: "success",
           duration: 3000,
         });
-      } catch {
+      } catch (err) {
+        // The thrown value, not the store: this callback closes over the state
+        // of the render it was created in, which is the state before the load.
         addToast({
           title: t("toast.config_load_failed"),
-          description: error?.message ?? t("toast.try_again"),
+          description: describeAppError(toAppError(err)) || t("toast.try_again"),
           variant: "destructive",
           duration: 5000,
         });
       }
     },
-    [load, clearValidation, addToast, t, error]
+    [load, clearValidation, addToast, t]
   );
 
   const _handleValidate = useCallback(async () => {
@@ -74,8 +78,8 @@ function App() {
     startValidation();
     try {
       const result = await validate();
-      setErrors(result.errors ?? []);
-      setWarnings(result.warnings ?? []);
+      setErrors(result.errors);
+      setWarnings(result.warnings);
       if (result.valid) {
         addToast({
           title: t("toast.validate_ok"),
@@ -85,14 +89,15 @@ function App() {
       } else {
         addToast({
           title: t("toast.validate_failed"),
-          description: t("validation.errors_count", { count: result.errors?.length ?? 0 }),
+          description: t("validation.errors_count", { count: result.errors.length }),
           variant: "destructive",
           duration: 5000,
         });
       }
-    } catch {
+    } catch (err) {
       addToast({
         title: t("toast.validate_failed"),
+        description: describeAppError(toAppError(err)),
         variant: "destructive",
         duration: 5000,
       });
@@ -111,26 +116,26 @@ function App() {
       // Validate before save when backend supports it; surface result via toasts.
       startValidation();
       const result = await validate();
-      setErrors(result.errors ?? []);
-      setWarnings(result.warnings ?? []);
+      setErrors(result.errors);
+      setWarnings(result.warnings);
       finishValidation();
 
       if (!result.valid) {
         addToast({
           title: t("toast.save_blocked"),
-          description: t("validation.errors_count", { count: result.errors?.length ?? 0 }),
+          description: t("validation.errors_count", { count: result.errors.length }),
           variant: "destructive",
           duration: 5000,
         });
         return;
       }
 
-      const saveResult = await save({ createBackup: true });
+      const saveResult = await save({ "create-backup": true });
       if (saveResult.success) {
         addToast({
           title: t("toast.save_ok"),
-          description: saveResult.backupId
-            ? t("toast.backup_created", { id: saveResult.backupId })
+          description: saveResult["backup-id"]
+            ? t("toast.backup_created", { id: saveResult["backup-id"] })
             : undefined,
           variant: "success",
           duration: 3000,
@@ -138,15 +143,15 @@ function App() {
       } else {
         addToast({
           title: t("toast.save_failed"),
-          description: saveResult.errors?.join("; "),
           variant: "destructive",
           duration: 5000,
         });
       }
-    } catch {
+    } catch (err) {
       finishValidation();
       addToast({
         title: t("toast.save_failed"),
+        description: describeAppError(toAppError(err)),
         variant: "destructive",
         duration: 5000,
       });
@@ -169,7 +174,7 @@ function App() {
           )}
         >
           <Header
-            configPath={meta?.path ?? null}
+            configPath={meta?.["main-path"] ?? null}
             isDirty={dirty}
             isLoading={busy}
             onSave={handleSave}
@@ -179,7 +184,7 @@ function App() {
             {!config ? (
               <EmptyState
                 loading={loading}
-                errorMessage={error?.message}
+                errorMessage={errorText}
                 onOpen={handleOpen}
               />
             ) : (

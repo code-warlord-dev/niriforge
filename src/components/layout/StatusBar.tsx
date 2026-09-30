@@ -31,9 +31,9 @@ export function StatusBar() {
               : t("validation.no_errors")}
       </span>
       {dirty ? <span className="text-amber-600 dark:text-amber-400">{t("status.unsaved")}</span> : null}
-      {meta?.path ? (
-        <span className="ml-auto truncate font-mono" title={meta.path}>
-          {meta.path}
+      {meta?.["main-path"] ? (
+        <span className="ml-auto truncate font-mono" title={meta["main-path"]}>
+          {meta["main-path"]}
         </span>
       ) : (
         <span className="ml-auto">{t("status.no_config")}</span>
