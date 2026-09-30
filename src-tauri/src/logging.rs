@@ -35,8 +35,8 @@ pub fn init_logging() {
         // With file logging: use a Tee writer to write to both stdout and file
         init_with_file(env_filter).expect("failed to initialize logging with file");
     } else {
-        // Console only
-        fmt::Subscriber::builder()
+        // Console only - use set_global_default to handle already-initialized logger gracefully
+        let subscriber = fmt::Subscriber::builder()
             .with_env_filter(env_filter)
             .with_target(true)
             .with_thread_ids(false)
@@ -44,7 +44,12 @@ pub fn init_logging() {
             .with_level(true)
             .with_file(false)
             .with_line_number(false)
-            .init();
+            .finish();
+
+        // Use set_global_default to handle already-initialized logger gracefully
+        if tracing::subscriber::set_global_default(subscriber).is_err() {
+            tracing::warn!("Logger already initialized, skipping initialization");
+        }
     }
 
     // Log startup info
