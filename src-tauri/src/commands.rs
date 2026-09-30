@@ -188,6 +188,12 @@ pub async fn restore_backup(_id: String) -> AppResult<()> {
 }
 
 #[command]
+pub async fn serialize_file() -> AppResult<String> {
+    // TODO: Implement serialization of the full config
+    Err(AppError::other("Not implemented yet"))
+}
+
+#[command]
 pub async fn create_backup(
     _name: Option<String>,
     _comment: Option<String>,
