@@ -15,6 +15,7 @@ import { OutputsCanvas } from "@/components/outputs/OutputsCanvas";
 import { OutputPropertiesPanel } from "@/components/outputs/OutputPropertiesPanel";
 import { OutputKDLPanel } from "@/components/outputs/OutputKDLPanel";
 import type { OutputInfo } from "@/types/config";
+import { logger } from "@/lib/logger";
 
 export function OutputsPage() {
   const { t } = useTranslation();
@@ -27,6 +28,8 @@ export function OutputsPage() {
 
   const selectedOutputId = useOutputsCanvasStore((s) => s.selectedOutputId);
   const setSelectedOutputId = useOutputsCanvasStore((s) => s.setSelectedOutputId);
+  const zoom = useOutputsCanvasStore((s) => s.zoom);
+  const pan = useOutputsCanvasStore((s) => s.pan);
 
   const validationErrors = useValidationStore((s) => s.errors);
   const validationWarnings = useValidationStore((s) => s.warnings);
@@ -42,6 +45,12 @@ export function OutputsPage() {
 
   const hasConfig = !!config;
 
+  // Log mount
+  useEffect(() => {
+    logger.info("OutputsPage", "mounted");
+    return () => logger.info("OutputsPage", "unmounted");
+  }, []);
+
   // Collect all available modes from config
   const configModes = useMemo(() => {
     if (!config) return [];
@@ -54,6 +63,7 @@ export function OutputsPage() {
 
   // Load live outputs from niri if running
   const loadLiveOutputs = useCallback(async () => {
+    logger.debug("OutputsPage", "loading live outputs");
     try {
       const result = await invokeCommand<OutputInfo[]>("get_outputs", {});
       const newLiveOutputs = new Map<string, { modes: string[]; currentMode: string }>();
@@ -70,9 +80,10 @@ export function OutputsPage() {
 
       setLiveOutputs(newLiveOutputs);
       setAvailableModes(Array.from(allModes).sort());
+      logger.info("OutputsPage", "live outputs loaded", { count: result.length });
     } catch (err) {
       // niri not running or error - silently ignore, use config modes only
-      console.debug("Could not load live outputs:", err);
+      logger.debug("OutputsPage", "could not load live outputs", err);
       setAvailableModes(configModes);
     }
   }, [configModes]);
@@ -84,19 +95,35 @@ export function OutputsPage() {
   // Auto-select first output if none selected
   useEffect(() => {
     if (config && config.outputs.length > 0 && !selectedOutputId) {
+      logger.debug("OutputsPage", "auto-selecting first output", { outputId: config.outputs[0].name });
       setSelectedOutputId(config.outputs[0].name);
     }
   }, [config, selectedOutputId, setSelectedOutputId]);
 
+  // Log zoom/pan changes (debounced)
+  useEffect(() => {
+    logger.trace("OutputsPage", "zoom changed", { zoom });
+  }, [zoom]);
+
+  useEffect(() => {
+    logger.trace("OutputsPage", "pan changed", { pan });
+  }, [pan]);
+
   const handleValidate = useCallback(async () => {
     if (!config) return;
+    logger.info("OutputsPage", "validate triggered");
     startValidation();
     try {
       const result = await validate();
       setErrors(result.errors);
       setWarnings(result.warnings);
+      logger.info("OutputsPage", "validation complete", {
+        valid: result.valid,
+        errors: result.errors.length,
+        warnings: result.warnings.length,
+      });
     } catch (err) {
-      console.error("Validation failed:", err);
+      logger.error("OutputsPage", "validation failed", err);
     } finally {
       finishValidation();
     }
@@ -104,6 +131,7 @@ export function OutputsPage() {
 
   const handleSave = useCallback(async () => {
     if (!config) return;
+    logger.info("OutputsPage", "save triggered");
     try {
       startValidation();
       const result = await validate();
@@ -112,17 +140,23 @@ export function OutputsPage() {
       finishValidation();
 
       if (!result.valid) {
+        logger.warn("OutputsPage", "save aborted: validation failed", {
+          errors: result.errors.length,
+          warnings: result.warnings.length,
+        });
         return;
       }
 
       await save({ "create-backup": true });
+      logger.info("OutputsPage", "save successful");
     } catch (err) {
-      console.error("Save failed:", err);
+      logger.error("OutputsPage", "save failed", err);
       finishValidation();
     }
   }, [config, validate, save, startValidation, finishValidation, setErrors, setWarnings]);
 
   const handleReload = useCallback(async () => {
+    logger.info("OutputsPage", "reload triggered");
     clearValidation();
     await load();
     await loadLiveOutputs();

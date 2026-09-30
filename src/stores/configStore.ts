@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { invokeCommand, toAppError } from "@/lib/ipc";
+import { logger } from "@/lib/logger";
 import type {
   AppError,
   Config,
@@ -43,9 +44,14 @@ export const useConfigStore = create<ConfigState>()(
     error: null,
 
     load: async (path?: string) => {
+      logger.debug("configStore", "loading config", { path });
       set({ loading: true, error: null });
       try {
         const result = await invokeCommand<ConfigDto>("load_config", { path });
+        logger.info("configStore", "config loaded", {
+          outputsCount: result.config.outputs.length,
+          hasMeta: !!result.meta,
+        });
         set({
           config: result.config,
           original: structuredClone<Config>(result.config),
@@ -54,12 +60,14 @@ export const useConfigStore = create<ConfigState>()(
           loading: false,
         });
       } catch (err) {
+        logger.error("configStore", "failed to load config", err);
         set({ error: toAppError(err), loading: false });
         throw err;
       }
     },
 
     save: async (opts?: SaveOptions) => {
+      logger.debug("configStore", "saving config", { options: opts });
       set({ saving: true, error: null });
       try {
         const { config, meta } = get();
@@ -69,14 +77,18 @@ export const useConfigStore = create<ConfigState>()(
           options: opts ?? {},
         });
         if (result.success) {
+          logger.info("configStore", "config saved successfully");
           set({
             original: structuredClone<Config>(config),
             dirty: false,
             saving: false,
           });
+        } else {
+          logger.warn("configStore", "save returned failure", result);
         }
         return result;
       } catch (err) {
+        logger.error("configStore", "failed to save config", err);
         set({ error: toAppError(err), saving: false });
         throw err;
       }
@@ -85,12 +97,20 @@ export const useConfigStore = create<ConfigState>()(
     validate: async () => {
       const { config, meta } = get();
       if (!config || !meta) throw new Error("No config is loaded");
-      return invokeCommand<ValidationResult>("validate_config", {
+      logger.debug("configStore", "validating config");
+      const result = await invokeCommand<ValidationResult>("validate_config", {
         config: { config, meta },
       });
+      logger.info("configStore", "validation complete", {
+        valid: result.valid,
+        errorsCount: result.errors.length,
+        warningsCount: result.warnings.length,
+      });
+      return result;
     },
 
     update: (fn: (draft: Config) => void) => {
+      logger.trace("configStore", "updating config");
       set((state) => {
         if (state.config) {
           fn(state.config);

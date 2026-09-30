@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { toIssues, type ValidationError, type ValidationIssue } from "@/types/config";
+import { logger } from "@/lib/logger";
 
 interface ValidationState {
   errors: ValidationIssue[];
@@ -25,8 +26,14 @@ export const useValidationStore = create<ValidationState>()(
 
     // The backend sends `ValidationError`s; the identity a row needs is ours to
     // make, so it is made once here rather than guessed at in the panel.
-    setErrors: (errors) => set({ errors: toIssues(errors) }),
-    setWarnings: (warnings) => set({ warnings: toIssues(warnings) }),
+    setErrors: (errors) => {
+      logger.debug("validationStore", "setting errors", { count: errors.length });
+      set({ errors: toIssues(errors) });
+    },
+    setWarnings: (warnings) => {
+      logger.debug("validationStore", "setting warnings", { count: warnings.length });
+      set({ warnings: toIssues(warnings) });
+    },
     addError: (error) =>
       set((current) => {
         current.errors.push(...toIssues([error]));

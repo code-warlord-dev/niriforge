@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppError, ValidationError } from "@/types/config";
+import { logger } from "@/lib/logger";
 
 /**
  * The boundary.
@@ -32,7 +33,22 @@ export function invokeCommand<T>(
   command: CommandName,
   args?: Record<string, unknown>
 ): Promise<T> {
-  return invoke<T>(command, args);
+  logger.debug("ipc", `invoking command: ${command}`, args);
+  const start = performance.now();
+  return invoke<T>(command, args)
+    .then((result) => {
+      logger.debug("ipc", `command succeeded: ${command}`, {
+        durationMs: performance.now() - start,
+      });
+      return result;
+    })
+    .catch((error) => {
+      logger.error("ipc", `command failed: ${command}`, {
+        durationMs: performance.now() - start,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    });
 }
 
 /**

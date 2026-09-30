@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import type { Position } from "@/types/config";
+import { logger } from "@/lib/logger";
 
 interface DragState {
   isDragging: boolean;
@@ -51,26 +52,34 @@ export const useOutputsCanvasStore = create<OutputsCanvasState>()(
 
     setZoom: (zoom) =>
       set((state) => {
-        state.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+        logger.trace("outputsCanvas", "zoom changed", { zoom: newZoom });
+        state.zoom = newZoom;
       }),
 
     zoomIn: () =>
       set((state) => {
-        state.zoom = Math.min(MAX_ZOOM, state.zoom + ZOOM_STEP);
+        const newZoom = Math.min(MAX_ZOOM, state.zoom + ZOOM_STEP);
+        logger.trace("outputsCanvas", "zoom in", { zoom: newZoom });
+        state.zoom = newZoom;
       }),
 
     zoomOut: () =>
       set((state) => {
-        state.zoom = Math.max(MIN_ZOOM, state.zoom - ZOOM_STEP);
+        const newZoom = Math.max(MIN_ZOOM, state.zoom - ZOOM_STEP);
+        logger.trace("outputsCanvas", "zoom out", { zoom: newZoom });
+        state.zoom = newZoom;
       }),
 
     resetZoom: () =>
       set((state) => {
+        logger.debug("outputsCanvas", "reset zoom");
         state.zoom = 1;
       }),
 
     setPan: (pan) =>
       set((state) => {
+        logger.trace("outputsCanvas", "pan changed", { pan });
         state.pan = pan;
       }),
 
@@ -78,20 +87,24 @@ export const useOutputsCanvasStore = create<OutputsCanvasState>()(
       set((state) => {
         state.pan.x += delta.x;
         state.pan.y += delta.y;
+        logger.trace("outputsCanvas", "pan by", { delta, pan: state.pan });
       }),
 
     resetPan: () =>
       set((state) => {
+        logger.debug("outputsCanvas", "reset pan");
         state.pan = { x: 0, y: 0 };
       }),
 
     setSelectedOutputId: (id) =>
       set((state) => {
+        logger.debug("outputsCanvas", "selected output changed", { outputId: id });
         state.selectedOutputId = id;
       }),
 
     startDrag: (outputId, position, pointer) =>
       set((state) => {
+        logger.debug("outputsCanvas", "drag started", { outputId, position, pointer });
         state.dragState = {
           isDragging: true,
           outputId,
@@ -102,6 +115,7 @@ export const useOutputsCanvasStore = create<OutputsCanvasState>()(
 
     endDrag: () =>
       set((state) => {
+        logger.debug("outputsCanvas", "drag ended", { outputId: state.dragState.outputId });
         state.dragState = {
           isDragging: false,
           outputId: null,
@@ -112,12 +126,15 @@ export const useOutputsCanvasStore = create<OutputsCanvasState>()(
 
     toggleGrid: () =>
       set((state) => {
+        logger.debug("outputsCanvas", "grid toggled", { showGrid: !state.showGrid });
         state.showGrid = !state.showGrid;
       }),
 
     setGridSize: (size) =>
       set((state) => {
-        state.gridSize = Math.max(10, Math.min(100, size));
+        const newSize = Math.max(10, Math.min(100, size));
+        logger.debug("outputsCanvas", "grid size changed", { gridSize: newSize });
+        state.gridSize = newSize;
       }),
   }))
 );
