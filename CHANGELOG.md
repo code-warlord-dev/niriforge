@@ -5,6 +5,84 @@ All notable changes to NiriForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] — 2026-09-30
+
+FS and safety, milestone 1.2 of the phase 1 plan: the write path.
+
+### Added
+
+- **Atomic write.** A config is replaced by writing a temporary file in the same
+  directory, `fsync`ing it, and renaming it over the target. A reader sees the old
+  file or the new one, never a half-written one, and the temporary file is removed on
+  every failure path. A symlinked config is written *through* to the file behind the
+  link, so a dotfiles or Home Manager setup does not end up with two configs. The
+  target's permission bits are carried over; a config created from nothing starts
+  `0600`.
+- **Backup manager.** Every successful save is preceded by a backup of the **whole**
+  config set — the entry point and every include — because restoring one file out of a
+  set leaves something niri will not load. Backups carry a `metadata.json` with a
+  timestamp, the file list, the niri version, an optional comment and a SHA-256 over
+  the stored bytes. Automatic backups are rotated to the 20 most recent; named ones
+  are never rotated away. Restoring is itself reversible: the state being replaced is
+  backed up first, and a backup with a file missing from it is refused before
+  anything is written.
+- **Compositor-side validation.** `niri validate -c <candidate>` runs against the
+  staged candidate before it replaces anything, so a config niri would refuse is never
+  written. Diagnostics are parsed into file, line, column and message, and a message
+  that cannot be read is kept as text rather than dropped.
+- **File watcher** over the entry point and every file in the include set. It reports
+  what changed and leaves the decision alone: reloading a config the user is editing
+  and ignoring an edit they made elsewhere are different answers, and only the
+  application knows which applies.
+- **The save transaction** as a single ordered function, so the safety order —
+  edit → stage → validate → back up → replace → update the read model — cannot be
+  skipped by a caller. A test checks that the only production code that puts a staged
+  file onto a config is inside it. A file whose text did not actually change is not
+  rewritten: the entry point is staged for the validation check, and replacing it
+  anyway would show the user an edit they did not make.
+
+### Fixed
+
+- `BackupManager::default` called `.expect()` on a constructor that can fail. A backup
+  directory that could not be created panicked during start-up with no message and no
+  path; it is now an error the user can act on.
+- The config watcher was filtered to `Create` and data-modify events, so it never
+  noticed an atomic replace — which is how NiriForge itself saves, and how most editors
+  save. Watching parent directories and reading the state off the filesystem fixed it.
+- Two backup ids taken within the same clock tick landed in the same directory, so the
+  second overwrote the first and a later rotation deleted a backup the user still
+  believed they had. Ids now carry a monotonic counter.
+- Automatic rotation walked the whole backup directory, which is how a named backup the
+  user asked to keep could be deleted as garbage. The automatic scan is now flat, and
+  named backups are only ever touched by an explicit per-name rotation.
+
+### Changed
+
+- The `coverage` badge is refreshed: **82.62% of Rust lines (1631/1974)**, measured at
+  this release.
+
+### Known limitations
+
+- **A multi-file save is not atomic across files.** Each `rename` is; the sequence is
+  not. A failure between two renames leaves the set mixed, and the error names the
+  backup that restores a consistent state. A single-file config cannot hit this.
+- **If `niri` is not installed, a save proceeds unchecked.** This is deliberate —
+  editing a config for another machine is normal — but the save reports that nothing
+  verified it, and that state is never presented as a pass.
+- **A backup is only as good as the disk it is on.** `metadata.json` carries a hash so
+  the application can tell a damaged backup from an intact one, but nothing detects bit
+  rot until it is asked.
+- **A restore is not validated.** It backs up the state it is about to replace first, so
+  a mistaken restore can be undone, and it replaces file by file. A validation gate on
+  restore was considered and left out on purpose: a gate that refuses a restore is a
+  user with no way back.
+- **`apply_config` still only writes fields that already have a node.** Changing
+  `screenshot-path`, `prefer-no-csd`, `layout.gaps` or `blur` is what the save path
+  currently carries; a field with no node in the document is not added.
+- The Tauri commands are still stubs. Nothing calls the save path from the UI yet, so
+  the guarantees above are not yet reachable by a user.
+- The watcher reports changes; there is no reload, no prompt and no diff yet.
+
 ## [0.1.7] — 2026-09-30
 
 ### Added

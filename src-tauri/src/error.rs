@@ -222,13 +222,33 @@ impl From<IncludeError> for AppError {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ValidationError {
     pub file: Option<String>,
     pub line: Option<usize>,
     pub column: Option<usize>,
     pub message: String,
     pub code: Option<String>,
+}
+
+impl ValidationError {
+    /// One line naming the place, when it is known, and the message.
+    ///
+    /// A validation error without a location is still worth printing: "somewhere in
+    /// your config" beats silence, and the message is what the user acts on.
+    pub fn describe(&self) -> String {
+        match (&self.file, self.line, self.column) {
+            (Some(file), Some(line), Some(column)) => {
+                format!("{file}:{line}:{column}: {}", self.message)
+            }
+            (Some(file), Some(line), None) => format!("{file}:{line}: {}", self.message),
+            (Some(file), None, _) => format!("{file}: {}", self.message),
+            (None, Some(line), Some(column)) => {
+                format!("line {line}, column {column}: {}", self.message)
+            }
+            (None, _, _) => self.message.clone(),
+        }
+    }
 }
 
 impl AppError {
