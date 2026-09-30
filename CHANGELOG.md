@@ -5,6 +5,28 @@ All notable changes to NiriForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] — 2026-09-30
+
+### Added
+
+- **Backend coverage measurement**: a `Backend Coverage (tarpaulin)` CI job runs
+  `cargo tarpaulin --engine ptrace --out Lcov --lib --tests` on `stable` and publishes
+  an LCOV artifact plus a per-file table in the job summary. Coverage is reported, not
+  enforced — there is no threshold.
+- A `coverage` badge in the README. **Baseline figure: 72.75% of Rust lines
+  (857/1178), measured at this release.** The number is maintained by hand and must be
+  refreshed in the README and here at each release. It covers the Rust crate only; the
+  frontend has no test suite, so nothing in this figure refers to it.
+
+### Changed
+
+- README badge row reduced to six badges in a fixed order: version, CI, coverage, Rust,
+  Tauri, license. The Rust badge now links to rust-lang.org and the Tauri badge gained
+  its logo and colour. The Linux and Wayland badges are gone — the platform they claimed
+  is already stated in the prose and in `docs/VERSIONING.md`.
+- `docs/guides/DEVELOPMENT.md` documents the local coverage command and drops `pnpm test`
+  from the command list, since no such script exists.
+
 ## [0.1.6] — 2026-09-30
 
 ### Changed

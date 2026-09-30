@@ -1,6 +1,6 @@
 [package]
 name = "niriforge"
-version = "0.1.6"
+version = "0.1.7"
 description = "GUI configurator for niri Wayland compositor"
 authors = ["code_warlord"]
 edition = "2021"
