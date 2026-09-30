@@ -37,7 +37,8 @@
     "expand": "Expand",
     "clear": "Clear",
     "navigation": "Navigation",
-    "main_navigation": "Main Navigation"
+    "main_navigation": "Main Navigation",
+    "loading": "Loading…"
   },
   "validation": {
     "title": "Validation",
@@ -75,5 +76,42 @@
     "save_failed": "Save failed",
     "save_blocked": "Save blocked — fix validation errors",
     "backup_created": "Backup: {{id}}"
+  },
+  "outputs": {
+    "title": "Outputs",
+    "properties": "Properties",
+    "kdl_block": "KDL Block",
+    "basic": "Basic",
+    "advanced": "Advanced",
+    "enabled": "Enabled",
+    "mode": "Mode",
+    "auto": "Auto (preferred)",
+    "scale": "Scale",
+    "transform": "Transform",
+    "position": "Position",
+    "position_x": "X coordinate",
+    "position_y": "Y coordinate",
+    "position_hint": "Drag on canvas or enter coordinates manually",
+    "vrr": "Variable Refresh Rate",
+    "focus_at_startup": "Focus at Startup",
+    "background_color": "Background Color",
+    "max_bpc": "Max BPC",
+    "select_output": "Select an output",
+    "select_another": "Select another output",
+    "outputs_count": "{{count}} output(s)",
+    "no_config": "No configuration loaded",
+    "load_config_first": "Load a configuration first to manage outputs",
+    "empty_title": "No outputs configured",
+    "empty_description": "No outputs found in the current configuration.",
+    "add_output": "Add Output",
+    "run_niri_hint": "Run niri to detect available outputs",
+    "live": "Live",
+    "zoom_in": "Zoom In",
+    "zoom_out": "Zoom Out",
+    "reset_view": "Reset View",
+    "toggle_grid": "Toggle Grid",
+    "copy_kdl": "Copy KDL",
+    "identify": "Identify",
+    "kdl_collapsed": "KDL block collapsed — click to expand"
   }
 }

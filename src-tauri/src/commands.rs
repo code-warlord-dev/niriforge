@@ -188,7 +188,10 @@ pub async fn restore_backup(_id: String) -> AppResult<()> {
 }
 
 #[command]
-pub async fn create_backup(_name: Option<String>, _comment: Option<String>) -> AppResult<BackupMeta> {
+pub async fn create_backup(
+    _name: Option<String>,
+    _comment: Option<String>,
+) -> AppResult<BackupMeta> {
     // TODO: Implement backup creation
     Err(AppError::other("Not implemented yet"))
 }
@@ -231,7 +234,10 @@ mod tests {
     #[test]
     fn save_options_default_to_the_safe_answer() {
         let options: SaveOptions = serde_json::from_str("{}").expect("an empty request is valid");
-        assert!(options.create_backup, "a save takes a backup unless told not to");
+        assert!(
+            options.create_backup,
+            "a save takes a backup unless told not to"
+        );
         assert!(
             options.validate,
             "a save refuses invalid config unless told not to"
