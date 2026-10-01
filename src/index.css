@@ -32,7 +32,8 @@
 
   --color-mono-accent: #38bdf8;
 
-  /* Typography */
+  /* Typography
+     system fallbacks; bundled webfonts are intentionally not loaded at runtime */
   --font-sans: Inter, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 

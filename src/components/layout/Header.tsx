@@ -3,7 +3,6 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Save, CheckCircle } from "lucide-react";
 
 interface HeaderProps {
@@ -72,8 +71,6 @@ export function Header({
             <Save className="h-4 w-4" />
             <span>{t("common.save")}</span>
           </Button>
-
-          <ThemeToggle />
         </div>
       </div>
     </header>

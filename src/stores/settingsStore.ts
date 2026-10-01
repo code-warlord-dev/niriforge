@@ -20,7 +20,7 @@ export const useSettingsStore = create<SettingsState>()(
   immer(
     persist(
       (set) => ({
-        theme: "system",
+        theme: "dark",
         locale: "en",
 
         setTheme: (theme) => set({ theme }),
