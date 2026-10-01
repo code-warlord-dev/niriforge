@@ -8,6 +8,18 @@ import { EmptyState } from "@/components/pages/EmptyState";
 import { SectionPlaceholder } from "@/components/pages/SectionPlaceholder";
 import { OutputsPage } from "@/pages/OutputsPage";
 import { OverviewPage } from "@/pages/OverviewPage";
+import { InputPage } from "@/pages/InputPage";
+import { KeyBindingsPage } from "@/pages/KeyBindingsPage";
+import { LayoutPage } from "@/pages/LayoutPage";
+import { WindowRulesPage } from "@/pages/WindowRulesPage";
+import { LayerRulesPage } from "@/pages/LayerRulesPage";
+import { AnimationsPage } from "@/pages/AnimationsPage";
+import { WorkspacesPage } from "@/pages/WorkspacesPage";
+import { StartupPage } from "@/pages/StartupPage";
+import { GesturesDebugPage } from "@/pages/GesturesDebugPage";
+import { RawKdlEditorPage } from "@/pages/RawKdlEditorPage";
+import { AppSettingsPage } from "@/pages/AppSettingsPage";
+import { BackupsProfilesPage } from "@/pages/BackupsProfilesPage";
 import { useConfigStore } from "@/stores/configStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useValidationStore } from "@/stores/validationStore";
@@ -193,6 +205,30 @@ function App() {
               <OverviewPage />
             ) : activePage === "outputs" ? (
               <OutputsPage />
+            ) : activePage === "input" ? (
+              <InputPage />
+            ) : activePage === "key-bindings" ? (
+              <KeyBindingsPage />
+            ) : activePage === "layout" ? (
+              <LayoutPage />
+            ) : activePage === "window-rules" ? (
+              <WindowRulesPage />
+            ) : activePage === "layer-rules" ? (
+              <LayerRulesPage />
+            ) : activePage === "animations" ? (
+              <AnimationsPage />
+            ) : activePage === "gestures" ? (
+              <GesturesDebugPage />
+            ) : activePage === "workspaces" ? (
+              <WorkspacesPage />
+            ) : activePage === "startup" ? (
+              <StartupPage />
+            ) : activePage === "app-settings" ? (
+              <AppSettingsPage />
+            ) : activePage === "backups-profiles" ? (
+              <BackupsProfilesPage />
+            ) : activePage === "raw-kdl" ? (
+              <RawKdlEditorPage />
             ) : (
               <SectionPlaceholder pageId={activePage} />
             )}

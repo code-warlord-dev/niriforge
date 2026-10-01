@@ -13,6 +13,6 @@
 1. **No demo/sample data feature** in the real application.
 2. Empty state = open real `~/.config/niri/config.kdl` (or chosen path).
 3. Validation / save feedback = toasts + status (green success, red failure).
-4. Themes: System / Dark / Light. i18n until 1.0: **ru + en** only.
+4. Theme: **dark** is the shipping theme; light and system are planned. i18n until 1.0: **ru + en** only.
 
 When implementing UI, follow **DESIGN-SYSTEM.md**. Treat Stitch screenshots as layout inspiration; strip any “demo data” chrome from those images conceptually.

@@ -1,6 +1,6 @@
 # NiriForge
 
-[![version v0.1.7](https://img.shields.io/github/v/tag/code-warlord-dev/niriforge?label=version&sort=semver)](https://github.com/code-warlord-dev/niriforge/tags)
+[![version v0.2.0](https://img.shields.io/github/v/tag/code-warlord-dev/niriforge?label=version&sort=semver)](https://github.com/code-warlord-dev/niriforge/tags)
 [![CI](https://github.com/code-warlord-dev/niriforge/actions/workflows/ci.yml/badge.svg)](https://github.com/code-warlord-dev/niriforge/actions/workflows/ci.yml)
 [![coverage 82.62%](https://img.shields.io/badge/coverage-82.62%25-4c1.svg)](docs/guides/DEVELOPMENT.md#покрытие-кода)
 [![Rust edition 2021](https://img.shields.io/badge/Rust-2021-000?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)

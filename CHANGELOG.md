@@ -5,6 +5,44 @@ All notable changes to NiriForge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-10-01
+
+The configuration screens and the `input` writeback.
+
+### Added
+
+- **Overview & Status.** An overview screen, part of the same set, that surfaces the
+  loaded config's state: config and IPC columns, a schema summary and validation
+  diagnostics.
+- **Configuration screens.** The dark interface now carries the screens the configurator
+  is built around: Input devices; Key bindings, with a bind table, modifier-combination
+  conflict detection and a keyboard map; Layout & columns; Window rules and Layer rules,
+  each an ordered pipeline with a KDL preview; Animations & curves, with a cubic-bezier
+  and spring editor and a preview that is not part of the saved model; Workspaces;
+  Startup & environment; Gestures & debug, read-only telemetry; Backups & profiles;
+  Raw KDL, an offline editor; and App settings, stored outside `config.kdl`.
+- **`input` writeback.** The backend applies the `input` section of a niri config —
+  keyboard, touchpad, mouse, trackpoint, tablet and touch — onto the KDL tree.
+- **Localization.** New strings for the screens are available in `en` and `ru`, with the
+  two key sets kept in sync.
+
+### Changed
+
+- The dark theme is the only theme in this build; the theme switcher is gone.
+
+### Removed
+
+- Font loading from the Google Fonts CDN and the other external runtime resources. The
+  interface runs offline on system fonts.
+
+## [0.1.9] — 2026-09-30
+
+### Added
+
+- **Generated type contract.** The frontend types are generated from the Rust schema and
+  checked in CI, so a change on either side that is not mirrored by the other fails the
+  build.
+
 ## [0.1.8] — 2026-09-30
 
 FS and safety, milestone 1.2 of the phase 1 plan: the write path.

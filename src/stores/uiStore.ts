@@ -44,7 +44,7 @@ export const useUiStore = create<UiState>()(
       (set) => ({
         sidebarOpen: true,
         activePage: "outputs",
-        theme: "system",
+        theme: "dark",
         locale: "en",
         toasts: [],
         dialogs: [],

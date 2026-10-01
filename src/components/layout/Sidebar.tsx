@@ -32,16 +32,17 @@ const pages = [
   { id: "overview", icon: LayoutDashboard, translationKey: "sidebar.overview" },
   { id: "outputs", icon: Monitor, translationKey: "sidebar.outputs" },
   { id: "input", icon: Keyboard, translationKey: "sidebar.input" },
-  { id: "binds", icon: Keyboard, translationKey: "sidebar.binds" },
+  { id: "key-bindings", icon: Keyboard, translationKey: "sidebar.key-bindings" },
   { id: "layout", icon: LayoutGrid, translationKey: "sidebar.layout" },
-  { id: "rules", icon: GanttChart, translationKey: "sidebar.rules" },
+  { id: "window-rules", icon: GanttChart, translationKey: "sidebar.window-rules" },
+  { id: "layer-rules", icon: LayoutDashboard, translationKey: "sidebar.layer-rules" },
   { id: "animations", icon: Zap, translationKey: "sidebar.animations" },
   { id: "gestures", icon: MousePointer2, translationKey: "sidebar.gestures" },
   { id: "workspaces", icon: Square, translationKey: "sidebar.workspaces" },
   { id: "startup", icon: Play, translationKey: "sidebar.startup" },
-  { id: "misc", icon: Settings, translationKey: "sidebar.misc" },
-  { id: "backups", icon: Database, translationKey: "sidebar.backups" },
-  { id: "raw", icon: FileCode, translationKey: "sidebar.raw" },
+  { id: "app-settings", icon: Settings, translationKey: "sidebar.app-settings" },
+  { id: "backups-profiles", icon: Database, translationKey: "sidebar.backups-profiles" },
+  { id: "raw-kdl", icon: FileCode, translationKey: "sidebar.raw-kdl" },
 ] as const;
 
 export function Sidebar({ isOpen, activePage, onPageChange, onToggle }: SidebarProps) {
